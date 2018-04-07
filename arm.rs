@@ -78,8 +78,6 @@ impl ArmIsaCpu for Cpu {
             return;
         }
 
-        let c = bit(cpsr, CPSR_C);
-
         use self::Instruction::*;
         let inst_type = self::Instruction::decode(inst);
         println!("Instruction: {:?}", inst_type);
@@ -88,6 +86,9 @@ impl ArmIsaCpu for Cpu {
                 let i = bit(inst, 25);
                 let s = bit(inst, 20);
                 let r = bit(inst, 4);
+
+                let c = bit(cpsr, CPSR_C);
+                let v = bit(cpsr, CPSR_V);
 
                 let opcode = extract(inst, 21, 4);
 
@@ -153,9 +154,9 @@ impl ArmIsaCpu for Cpu {
                 // execute the instruction now
                 let (res, new_v, new_c) = match opcode {
                     0x0 /* AND */ |
-                    0x8 /* TST */ => (valn & valm, 0, 0),
+                    0x8 /* TST */ => (valn & valm, v, shift_carry),
                     0x1 /* EOR */ |
-                    0x9 /* TEQ */ => (valn ^ valm, 0, 0),
+                    0x9 /* TEQ */ => (valn ^ valm, v, shift_carry),
                     0x2 /* SUB */ |
                     0xA /* CMP */ => sub_flags(valn, valm, 0),
                     0x3 /* RSB */ => sub_flags(valm, valn, 0),
@@ -164,12 +165,28 @@ impl ArmIsaCpu for Cpu {
                     0x5 /* ADC */ => add_flags(valn, valm, c),
                     0x6 /* SBC */ => sub_flags(valn, valm, 1-c),
                     0x7 /* RSC */ => sub_flags(valm, valn, 1-c),
-                    0xC /* ORR */ => (valn | valm, 0, 0),
-                    0xD /* MOV */ => (valm, 0, 0),
-                    0xE /* BIC */ => (valn & !valm, 0, 0),
-                    0xF /* MVN */ => (!valm, 0, 0),
+                    0xC /* ORR */ => (valn | valm, v, shift_carry),
+                    0xD /* MOV */ => (valm, v, shift_carry),
+                    0xE /* BIC */ => (valn & !valm, v, shift_carry),
+                    0xF /* MVN */ => (!valm, v, shift_carry),
                     _ => panic!(),
                 };
+
+                if s == 1 {
+                    if true || rd != 15 {
+                        let new_z = (res == 0) as u32;
+                        let new_n = is_neg(res) as u32;
+                        let new_flags = build_flags(new_v, new_c, new_z, new_n);
+                        self.reg[CPSR_REG] = set(self.reg[CPSR_REG], 28, 4, new_flags);
+                    } else {
+                        // FIXME: do SPSR registers
+                    }
+                }
+
+                match opcode {
+                    0x8 | 0x9 | 0xA | 0xB => (), // no writeback
+                    _ => self.reg[rd] = res,
+                }
             }
 
             _ => (),

@@ -55,12 +55,12 @@ pub fn shift_ror(val: u32, rot: u32) -> (u32, u32) {
 }
 
 #[inline]
-fn is_pos(val: u32) -> bool {
+pub fn is_pos(val: u32) -> bool {
     (val as i32) >= 0
 }
 
 #[inline]
-fn is_neg(val: u32) -> bool {
+pub fn is_neg(val: u32) -> bool {
     (val as i32) < 0
 }
 
