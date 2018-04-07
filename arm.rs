@@ -56,6 +56,10 @@ fn cond_met(cond: u32, cpsr: u32) -> bool {
     true
 }
 
+fn build_flags(v: u32, c: u32, z: u32, n: u32) -> u32 {
+    (v & 1) << 0 | (c & 1) << 1 | (z & 1) << 2 | (n & 1) << 3
+}
+
 pub trait ArmIsaCpu {
     fn execute(&mut self);
 }
@@ -83,6 +87,7 @@ impl ArmIsaCpu for Cpu {
             DataProc0 | DataProc1 | DataProc2 => {
                 let i = bit(inst, 25);
                 let s = bit(inst, 20);
+                let r = bit(inst, 4);
 
                 let opcode = extract(inst, 21, 4);
 
@@ -90,9 +95,7 @@ impl ArmIsaCpu for Cpu {
                 let rd = extract(inst, 12, 4) as Reg;
 
                 /// Three modes:
-                let (val2, shift_carry) = if inst_type == DataProc0
-                        || inst_type == DataProc1 {
-                    let r = bit(inst, 4);
+                let (valm, shift_carry) = if inst_type == DataProc0 || inst_type == DataProc1 {
                     debug_assert!((r == 1) == (inst_type == DataProc1));
                     let rm = extract(inst, 0, 4) as Reg;
                     let shift_type = extract(inst, 5, 2);
@@ -106,8 +109,7 @@ impl ArmIsaCpu for Cpu {
                         self.reg[rs] & 0xffu32
                     };
 
-                    let valm = self.reg[rm]
-                        + if rm == PC_REG { 8 + 4 * r } else { 0 };
+                    let valm = self.reg[rm] + if rm == PC_REG { 8 + 4 * r } else { 0 };
 
                     if r == 0 && shift == 0 {
                         match shift_type {
@@ -138,11 +140,36 @@ impl ArmIsaCpu for Cpu {
                 } else {
                     let shift = extract(inst, 8, 4) * 2;
                     let imm = extract(inst, 0, 8);
-                    rotate_right(imm, shift)
+                    shift_ror(imm, shift)
                 };
 
-                let valn = self.reg[rn]
-                    + if rn == PC_REG { 8 + 4 * r } else { 0 };
+                let valn = self.reg[rn] +
+                    if rn == PC_REG {
+                        8 + 4 * (i == 0 && r == 1) as u32
+                    } else {
+                        0
+                    };
+
+                // execute the instruction now
+                let (res, new_v, new_c) = match opcode {
+                    0x0 /* AND */ |
+                    0x8 /* TST */ => (valn & valm, 0, 0),
+                    0x1 /* EOR */ |
+                    0x9 /* TEQ */ => (valn ^ valm, 0, 0),
+                    0x2 /* SUB */ |
+                    0xA /* CMP */ => sub_flags(valn, valm, 0),
+                    0x3 /* RSB */ => sub_flags(valm, valn, 0),
+                    0x4 /* ADD */ |
+                    0xB /* CMN */ => add_flags(valn, valm, 0),
+                    0x5 /* ADC */ => add_flags(valn, valm, c),
+                    0x6 /* SBC */ => sub_flags(valn, valm, 1-c),
+                    0x7 /* RSC */ => sub_flags(valm, valn, 1-c),
+                    0xC /* ORR */ => (valn | valm, 0, 0),
+                    0xD /* MOV */ => (valm, 0, 0),
+                    0xE /* BIC */ => (valn & !valm, 0, 0),
+                    0xF /* MVN */ => (!valm, 0, 0),
+                    _ => panic!(),
+                };
             }
 
             _ => (),

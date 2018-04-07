@@ -54,6 +54,46 @@ pub fn shift_ror(val: u32, rot: u32) -> (u32, u32) {
     }
 }
 
+#[inline]
+fn is_pos(val: u32) -> bool {
+    (val as i32) >= 0
+}
+
+#[inline]
+fn is_neg(val: u32) -> bool {
+    (val as i32) < 0
+}
+
+/// Performs addition and returns overflow and carry bits
+#[inline]
+pub fn add_flags(lhs: u32, rhs: u32, carry: u32) -> (u32, u32, u32) {
+    // Logic copied from VisualBoyAdvance
+    let res = lhs.wrapping_add(rhs).wrapping_add(carry);
+
+    #[cfg_attr(rustfmt, rustfmt_skip)]
+    (res,
+     ((is_neg(lhs) && is_neg(rhs)) ||
+      (is_neg(lhs) && is_pos(res)) ||
+      (is_neg(rhs) && is_pos(res))) as u32,
+     ((is_neg(lhs) && is_neg(rhs) && is_pos(res)) ||
+      (is_pos(lhs) && is_pos(rhs) && is_neg(res))) as u32)
+}
+
+/// Performs subtraction and returns overflow and carry bits
+#[inline]
+pub fn sub_flags(lhs: u32, rhs: u32, carry: u32) -> (u32, u32, u32) {
+    // Logic copied from VisualBoyAdvance
+    let res = lhs.wrapping_sub(rhs).wrapping_sub(carry);
+
+    #[cfg_attr(rustfmt, rustfmt_skip)]
+    (res,
+     ((is_neg(lhs) && is_pos(rhs)) ||
+      (is_neg(lhs) && is_pos(res)) ||
+      (is_pos(rhs) && is_pos(res))) as u32,
+     ((is_neg(lhs) && is_pos(rhs) && is_pos(res)) ||
+      (is_pos(lhs) && is_neg(rhs) && is_neg(res))) as u32)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
