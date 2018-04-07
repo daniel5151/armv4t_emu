@@ -4,7 +4,6 @@ use super::bit_util::*;
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum Instruction {
     BranchImm,
-    BranchImmEx,
     BranchAbsEx,
     DataProc0,
     DataProc1,
@@ -12,9 +11,8 @@ enum Instruction {
     Invalid,
 }
 
-const INST_MATCH_ORDER: [Instruction; 7] = [
+const INST_MATCH_ORDER: [Instruction; 6] = [
     Instruction::BranchAbsEx,
-    Instruction::BranchImmEx,
     Instruction::BranchImm,
     Instruction::DataProc0,
     Instruction::DataProc1,
@@ -28,7 +26,6 @@ impl Instruction {
         #[cfg_attr(rustfmt, rustfmt_skip)]
         match *self {
             BranchImm   => (0x0e000000, 0x0a000000),
-            BranchImmEx => (0xfe000000, 0xfa000000),
             BranchAbsEx => (0x0fffffd0, 0x012fff10),
             DataProc0   => (0x0e000010, 0x00000000),
             DataProc1   => (0x0e000090, 0x00000010),
@@ -53,7 +50,30 @@ fn cond_code(inst: u32) -> u32 {
 }
 
 fn cond_met(cond: u32, cpsr: u32) -> bool {
-    true
+    let z = bit(cpsr, cpsr::Z);
+    let c = bit(cpsr, cpsr::C);
+    let v = bit(cpsr, cpsr::V);
+    let n = bit(cpsr, cpsr::N);
+
+    match cond {
+        0x0 => z == 1,
+        0x1 => z == 0,
+        0x2 => c == 1,
+        0x3 => c == 0,
+        0x4 => n == 1,
+        0x5 => n == 0,
+        0x6 => v == 1,
+        0x7 => v == 0,
+        0x8 => c == 1 && z == 0,
+        0x9 => c == 0 || z == 1,
+        0xA => n == v,
+        0xB => n != v,
+        0xC => z == 0 && n == v,
+        0xD => z == 1 || n != v,
+        0xE => true,
+        0xF => true, /* reserved, default to execute */
+        _ => panic!(),
+    }
 }
 
 fn build_flags(v: u32, c: u32, z: u32, n: u32) -> u32 {
@@ -66,15 +86,15 @@ pub trait ArmIsaCpu {
 
 impl ArmIsaCpu for Cpu {
     fn execute(&mut self) {
-        let pc = self.reg[PC_REG];
+        let pc = self.reg[reg::PC];
         let inst = self.mmu.load32(pc);
         // Decode first
         let cond = cond_code(inst);
 
-        let cpsr = self.reg[CPSR_REG];
+        let cpsr = self.reg[reg::PC];
 
         if !cond_met(cond, cpsr) {
-            self.reg[PC_REG] += 4;
+            self.reg[reg::PC] += 4;
             return;
         }
 
@@ -87,8 +107,8 @@ impl ArmIsaCpu for Cpu {
                 let s = bit(inst, 20);
                 let r = bit(inst, 4);
 
-                let c = bit(cpsr, CPSR_C);
-                let v = bit(cpsr, CPSR_V);
+                let c = bit(cpsr, cpsr::C);
+                let v = bit(cpsr, cpsr::V);
 
                 let opcode = extract(inst, 21, 4);
 
@@ -110,7 +130,7 @@ impl ArmIsaCpu for Cpu {
                         self.reg[rs] & 0xffu32
                     };
 
-                    let valm = self.reg[rm] + if rm == PC_REG { 8 + 4 * r } else { 0 };
+                    let valm = self.reg[rm] + if rm == reg::PC { 8 + 4 * r } else { 0 };
 
                     if r == 0 && shift == 0 {
                         match shift_type {
@@ -145,7 +165,7 @@ impl ArmIsaCpu for Cpu {
                 };
 
                 let valn = self.reg[rn] +
-                    if rn == PC_REG {
+                    if rn == reg::PC {
                         8 + 4 * (i == 0 && r == 1) as u32
                     } else {
                         0
@@ -173,11 +193,11 @@ impl ArmIsaCpu for Cpu {
                 };
 
                 if s == 1 {
-                    if true || rd != 15 {
+                    if true || rd != reg::PC {
                         let new_z = (res == 0) as u32;
                         let new_n = is_neg(res) as u32;
                         let new_flags = build_flags(new_v, new_c, new_z, new_n);
-                        self.reg[CPSR_REG] = set(self.reg[CPSR_REG], 28, 4, new_flags);
+                        self.reg[reg::CPSR] = set(self.reg[reg::CPSR], 28, 4, new_flags);
                     } else {
                         // FIXME: do SPSR registers
                     }
@@ -188,11 +208,16 @@ impl ArmIsaCpu for Cpu {
                     _ => self.reg[rd] = res,
                 }
             }
+            BranchImm => {
+                let l = bit(inst, 24);
+
+                let offset = extract(inst, 0, 24);
+            }
 
             _ => (),
         };
 
-        self.reg[PC_REG] += 4;
+        self.reg[reg::PC] += 4;
     }
 }
 

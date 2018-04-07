@@ -16,10 +16,23 @@ const NUM_RGSR: Reg = 37;
 const PC_REG: Reg = 15;
 const CPSR_REG: Reg = 36;
 
-const CPSR_N: Reg = 31;
-const CPSR_Z: Reg = 30;
-const CPSR_C: Reg = 29;
-const CPSR_V: Reg = 28;
+mod reg {
+    use super::Reg;
+
+    pub const PC: Reg = 15;
+    pub const CPSR: Reg = 36;
+}
+
+mod cpsr {
+    use super::Reg;
+
+    pub const N: Reg = 31;
+    pub const Z: Reg = 30;
+    pub const C: Reg = 29;
+    pub const V: Reg = 28;
+
+    pub const T: Reg = 5;
+}
 
 enum IsaMode {
     Arm,
