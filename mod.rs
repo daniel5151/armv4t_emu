@@ -4,6 +4,7 @@ use std::ops::{Index, IndexMut};
 
 use super::mmu::Mmu;
 
+mod bit_util;
 mod arm;
 
 use self::arm::ArmIsaCpu;
@@ -11,7 +12,14 @@ use self::arm::ArmIsaCpu;
 type Reg = u8;
 
 const NUM_RGSR: Reg = 37;
+
 const PC_REG: Reg = 15;
+const CPSR_REG: Reg = 36;
+
+const CPSR_N: Reg = 31;
+const CPSR_Z: Reg = 30;
+const CPSR_C: Reg = 29;
+const CPSR_V: Reg = 28;
 
 enum IsaMode {
     Arm,
@@ -46,7 +54,7 @@ impl IndexMut<Reg> for RegFile {
 pub struct Cpu {
     reg: RegFile,
     mmu: Mmu,
-    mode: IsaMode,
+    isa_mode: IsaMode,
 }
 
 impl Cpu {
@@ -54,7 +62,7 @@ impl Cpu {
         Cpu {
             reg: Default::default(),
             mmu: mmu,
-            mode: IsaMode::Arm,
+            isa_mode: IsaMode::Arm,
         }
     }
 }
