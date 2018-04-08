@@ -3,17 +3,25 @@ use super::bit_util::*;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum Instruction {
-    BranchImm,
-    BranchAbsEx,
+    BranchEx,
+    Branch,
     DataProc0,
     DataProc1,
     DataProc2,
+    PsrImm,
+    PsrReg,
+    Multiply,
+    MulLong,
     Invalid,
 }
 
-const INST_MATCH_ORDER: [Instruction; 6] = [
-    Instruction::BranchAbsEx,
-    Instruction::BranchImm,
+const INST_MATCH_ORDER: [Instruction; 10] = [
+    Instruction::BranchEx,
+    Instruction::Branch,
+    Instruction::PsrImm,
+    Instruction::PsrReg,
+    Instruction::Multiply,
+    Instruction::MulLong,
     Instruction::DataProc0,
     Instruction::DataProc1,
     Instruction::DataProc2,
@@ -25,11 +33,15 @@ impl Instruction {
         use self::Instruction::*;
         #[cfg_attr(rustfmt, rustfmt_skip)]
         match *self {
-            BranchImm   => (0x0e000000, 0x0a000000),
-            BranchAbsEx => (0x0fffffd0, 0x012fff10),
+            BranchEx    => (0x0fffffd0, 0x012fff10),
+            Branch      => (0x0e000000, 0x0a000000),
             DataProc0   => (0x0e000010, 0x00000000),
             DataProc1   => (0x0e000090, 0x00000010),
             DataProc2   => (0x0e000000, 0x02000010),
+            PsrImm      => (0x0fb00000, 0x03200000),
+            PsrReg      => (0x0f900ff0, 0x01000000),
+            Multiply    => (0x0fc000f0, 0x00000090),
+            MulLong     => (0x0f8000f0, 0x00800090),
             Invalid     => (0x00000000, 0x00000000),
         }
     }
@@ -102,6 +114,26 @@ impl ArmIsaCpu for Cpu {
         let inst_type = self::Instruction::decode(inst);
         println!("Instruction: {:?}", inst_type);
         match inst_type {
+            BranchEx => {
+                let rn = extract(inst, 0, 4) as Reg;
+                let new_pc = self.reg[rn];
+                self.reg[reg::PC] = self.reg[rn] & !1u32;
+                // maybe switch to thumb mode
+                self.reg[reg::CPSR] = self.reg[reg::CPSR] | (bit(new_pc, 0) << cpsr::T);
+            }
+            Branch => {
+                let l = bit(inst, 24);
+
+                let offset = extract(inst, 0, 24);
+                // Shift up to sign extend
+                // shift right by 6 (instead of 8) to multiply by 4
+                let s_offset = ((offset << 8) as i32 >> 6) as u32;
+                let old_pc = self.reg[reg::PC];
+                self.reg[reg::PC] = old_pc.wrapping_add(s_offset) + 4;
+                if l != 0 {
+                    self.reg[reg::LR] = old_pc + 4;
+                }
+            }
             DataProc0 | DataProc1 | DataProc2 => {
                 let i = bit(inst, 25);
                 let s = bit(inst, 20);
@@ -115,7 +147,7 @@ impl ArmIsaCpu for Cpu {
                 let rn = extract(inst, 16, 4) as Reg;
                 let rd = extract(inst, 12, 4) as Reg;
 
-                /// Three modes:
+                // Three modes:
                 let (valm, shift_carry) = if inst_type == DataProc0 || inst_type == DataProc1 {
                     debug_assert!((r == 1) == (inst_type == DataProc1));
                     let rm = extract(inst, 0, 4) as Reg;
@@ -208,13 +240,83 @@ impl ArmIsaCpu for Cpu {
                     _ => self.reg[rd] = res,
                 }
             }
-            BranchImm => {
-                let l = bit(inst, 24);
-
-                let offset = extract(inst, 0, 24);
+            PsrImm | PsrReg => {
+                // FIXME: requires SPSR registers and stuff
+                panic!();
             }
+            Multiply => {
+                let a = bit(inst, 21);
+                let s = bit(inst, 20);
 
-            _ => (),
+                let rd = extract(inst, 16, 4) as Reg;
+                let rn = extract(inst, 12, 4) as Reg;
+                let rs = extract(inst, 8, 4) as Reg;
+                let rm = extract(inst, 0, 4) as Reg;
+
+                let res = self.reg[rm].wrapping_mul(self.reg[rs]).wrapping_add(
+                    if a == 0 {
+                        0
+                    } else {
+                        self.reg[rn]
+                    },
+                );
+
+                self.reg[rd] = res;
+
+                if s == 1 {
+                    let v = bit(cpsr, cpsr::V);
+                    let new_z = (res == 0) as u32;
+                    let new_n = bit(res, 31);
+                    let new_flags = build_flags(v, 0, new_z, new_n);
+
+                    self.reg[reg::CPSR] = set(self.reg[reg::CPSR], 28, 4, new_flags);
+                }
+            }
+            MulLong => {
+                let u = bit(inst, 22);
+                let a = bit(inst, 21);
+                let s = bit(inst, 20);
+
+                let rdhi = extract(inst, 16, 4) as Reg;
+                let rdlo = extract(inst, 12, 4) as Reg;
+                let rs = extract(inst, 8, 4) as Reg;
+                let rm = extract(inst, 0, 4) as Reg;
+
+                let res: u64 = if u == 0 {
+                    let vs = self.reg[rs];
+                    let vm = self.reg[rm];
+
+                    let prod = (vs as u64) * (vm as u64);
+                    prod.wrapping_add(if a == 0 {
+                        0u64
+                    } else {
+                        combine64(self.reg[rdhi], self.reg[rdlo])
+                    })
+                } else {
+                    let vs = self.reg[rs] as i32;
+                    let vm = self.reg[rm] as i32;
+
+                    let prod = (vs as i64) * (vm as i64);
+                    prod.wrapping_add(if a == 0 {
+                        0i64
+                    } else {
+                        combine64(self.reg[rdhi], self.reg[rdlo]) as i64
+                    }) as u64
+                };
+
+                let (reshi, reslo) = split64(res);
+                self.reg[rdhi] = reshi;
+                self.reg[rdlo] = reslo;
+
+                if s != 0 {
+                    let new_z = (res == 0) as u32;
+                    let new_n = bit(reshi, 31);
+                    let new_flags = build_flags(0, 0, new_z, new_n);
+
+                    self.reg[reg::CPSR] = set(self.reg[reg::CPSR], 28, 4, new_flags);
+                }
+            }
+            Invalid => panic!(),
         };
 
         self.reg[reg::PC] += 4;
@@ -225,11 +327,20 @@ impl ArmIsaCpu for Cpu {
 mod test {
     use super::*;
     #[test]
+    #[cfg_attr(rustfmt, rustfmt_skip)]
     fn test_decode() {
         use super::Instruction::*;
-        assert_eq!(
-            DataProc0,
-            Instruction::decode(0b11100000000101100111000001100011u32)
-        );
+
+        // Instructions assembled by unicorn.js
+        assert_eq!(BranchEx,    Instruction::decode(0xE12FFF1C));
+        assert_eq!(Branch,      Instruction::decode(0xEB0000F8));
+        assert_eq!(DataProc0,   Instruction::decode(0xE1A0816C));
+        assert_eq!(DataProc1,   Instruction::decode(0xE0923011));
+        assert_eq!(DataProc1,   Instruction::decode(0xC0923011));
+        assert_eq!(DataProc2,   Instruction::decode(0xE2A23AFF));
+        assert_eq!(PsrImm,      Instruction::decode(0x1329F000));
+        assert_eq!(PsrReg,      Instruction::decode(0xE10FA000));
+        assert_eq!(Multiply,    Instruction::decode(0x80040393));
+        assert_eq!(MulLong,     Instruction::decode(0xE0834192));
     }
 }
