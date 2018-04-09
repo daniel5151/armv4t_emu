@@ -1,5 +1,6 @@
 use super::*;
 use super::bit_util::*;
+use super::reg::*;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum Instruction {
@@ -93,11 +94,13 @@ fn build_flags(v: u32, c: u32, z: u32, n: u32) -> u32 {
 }
 
 pub trait ArmIsaCpu {
-    fn execute(&mut self);
+    /// Executes one instruction and returns whether the CPU should continue
+    /// executing.
+    fn execute(&mut self) -> bool;
 }
 
 impl ArmIsaCpu for Cpu {
-    fn execute(&mut self) {
+    fn execute(&mut self) -> bool {
         let pc = self.reg[reg::PC];
         let inst = self.mmu.load32(pc);
         // Decode first
@@ -107,7 +110,7 @@ impl ArmIsaCpu for Cpu {
 
         if !cond_met(cond, cpsr) {
             self.reg[reg::PC] += 4;
-            return;
+            return true;
         }
 
         use self::Instruction::*;
@@ -316,10 +319,11 @@ impl ArmIsaCpu for Cpu {
                     self.reg[reg::CPSR] = set(self.reg[reg::CPSR], 28, 4, new_flags);
                 }
             }
-            Invalid => panic!(),
+            Invalid => return false,
         };
 
         self.reg[reg::PC] += 4;
+        true
     }
 }
 
@@ -343,4 +347,28 @@ mod test {
         assert_eq!(Multiply,    Instruction::decode(0x80040393));
         assert_eq!(MulLong,     Instruction::decode(0xE0834192));
     }
+
+    macro_rules! emutest {
+        ($name:ident, $mem_checks: expr) => {
+            #[test]
+            fn $name () {
+                use std::boxed::Box;
+
+                use mmu::raw::Raw;
+                let prog = include_bytes!(concat!("testdata/",
+                                                  stringify!($name),
+                                                  ".bin"));
+                let mmu = Raw::new_with_data(0x1000, prog);
+                let mut cpu = super::Cpu::new(Box::new(mmu), 0x0);
+                cpu.run();
+
+                let mem = cpu.memory();
+                for &(addr, val) in ($mem_checks).iter() {
+                    assert_eq!(val, mem.load32(addr));
+                }
+            }
+        }
+    }
+
+    emutest!(emutest_arm0, [(4u32, 0u32)]);
 }
