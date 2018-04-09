@@ -104,18 +104,21 @@ impl ArmIsaCpu for Cpu {
         let pc = self.reg[reg::PC];
         let inst = self.mmu.load32(pc);
         // Decode first
-        let cond = cond_code(inst);
+        let cond = extract(inst, 28, 4);
 
         let cpsr = self.reg[reg::PC];
 
+        debug!("pc: {:#010x}, inst: {:#010x}, cond: {:#03x}", pc, inst, cond);
+
         if !cond_met(cond, cpsr) {
+            debug!("cond not met");
             self.reg[reg::PC] += 4;
             return true;
         }
 
         use self::Instruction::*;
         let inst_type = self::Instruction::decode(inst);
-        println!("Instruction: {:?}", inst_type);
+        debug!("Instruction: {:?}", inst_type);
         match inst_type {
             BranchEx => {
                 let rn = extract(inst, 0, 4) as Reg;
@@ -329,6 +332,8 @@ impl ArmIsaCpu for Cpu {
 
 #[cfg(test)]
 mod test {
+    use env_logger;
+
     use super::*;
     #[test]
     #[cfg_attr(rustfmt, rustfmt_skip)]
@@ -355,6 +360,8 @@ mod test {
                 use std::boxed::Box;
 
                 use mmu::raw::Raw;
+
+                env_logger::init();
                 let prog = include_bytes!(concat!("testdata/",
                                                   stringify!($name),
                                                   ".bin"));
@@ -370,5 +377,6 @@ mod test {
         }
     }
 
-    emutest!(emutest_arm0, [(4u32, 0u32)]);
+    emutest!(emutest_arm0, [(0x100, 5),
+                            (0x104, 0)]);
 }
