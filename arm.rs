@@ -155,7 +155,13 @@ impl ArmIsaCpu for Cpu {
         let cpsr = self.reg[reg::CPSR];
         let cflags = extract(cpsr, 28, 4);
 
-        debug!("pc: {:#010x}, inst: {:#010x}, cond: {:#03x}, cflags: {:04b}", pc, inst, cond, cflags);
+        debug!(
+            "pc: {:#010x}, inst: {:#010x}, cond: {:#03x}, cflags: {:04b}",
+            pc,
+            inst,
+            cond,
+            cflags
+        );
 
         if !cond_met(cond, cpsr) {
             debug!("cond not met");
@@ -215,7 +221,7 @@ impl ArmIsaCpu for Cpu {
                         self.reg[rs] & 0xffu32
                     };
 
-                    let valm = self.reg[rm].wrapping_add(((rm == reg::PC) as u32) * ( 8 + 4 * r ));
+                    let valm = self.reg[rm].wrapping_add(((rm == reg::PC) as u32) * (8 + 4 * r));
 
                     if r == 0 && shift == 0 {
                         arg_shift0(valm, shift_type, c)
@@ -468,9 +474,7 @@ impl ArmIsaCpu for Cpu {
                     self.reg[rn] = post_addr;
                 }
             }
-            BlockXfer => {
-                panic!()
-            }
+            BlockXfer => panic!(),
             Invalid => return false,
         };
 
@@ -536,26 +540,35 @@ mod test {
         }
     }
 
-    emutest!(emutest_arm0, [(0x100, 5),
-                            (0x104, 0)]);
-    emutest!(emutest_arm1, [(0x100, 5),
-                            (0x104, 5),
-                            (0x108, 5)]);
-    emutest!(emutest_arm2, [(0x100, 6),
-                            (0x104, 0x200000e1),
-                            (0x108, 0xe100001c)]);
+    emutest!(emutest_arm0, [(0x100, 5), (0x104, 0)]);
+    emutest!(emutest_arm1, [(0x100, 5), (0x104, 5), (0x108, 5)]);
+    emutest!(
+        emutest_arm2,
+        [(0x100, 6), (0x104, 0x200000e1), (0x108, 0xe100001c)]
+    );
     emutest!(emutest_arm3, [(0x100, 64)]);
-    emutest!(emutest_arm4, [(0x100, 6),
-                            (0x104, 0x200000e1),
-                            (0x108, 0xe100001c),
-                            (0x10c, 6),
-                            (0x110, 6*0x100)]);
-    emutest!(emutest_arm5, [(0x100, 0xf000),
-                            (0x104, 0xfff0),
-                            (0x108, 0x104)]);
-    emutest!(emutest_arm6, [(0x1f4, 0xa),
-                            (0x1f8, 0xc),
-                            (0x1fc, 0x10),
-                            (0x200, 6),
-                            (0x204, 0x200)]);
+    emutest!(
+        emutest_arm4,
+        [
+            (0x100, 6),
+            (0x104, 0x200000e1),
+            (0x108, 0xe100001c),
+            (0x10c, 6),
+            (0x110, 6 * 0x100),
+        ]
+    );
+    emutest!(
+        emutest_arm5,
+        [(0x100, 0xf000), (0x104, 0xfff0), (0x108, 0x104)]
+    );
+    emutest!(
+        emutest_arm6,
+        [
+            (0x1f4, 0xa),
+            (0x1f8, 0xc),
+            (0x1fc, 0x10),
+            (0x200, 6),
+            (0x204, 0x200),
+        ]
+    );
 }
