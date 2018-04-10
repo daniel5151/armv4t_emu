@@ -4,7 +4,7 @@ use super::reg::*;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum Instruction {
-    BranchEx,
+    BranchEx, // Branch and exchange (i.e. switch to THUMB)
     Branch,
     DataProc0,
     DataProc1,
@@ -13,23 +13,27 @@ enum Instruction {
     PsrReg,
     Multiply,
     MulLong,
-    SingleXferI,
-    SingleXferR,
+    SingleXferI, // Single data transfer, immediate offset
+    SingleXferR, // Single data transfer, register offset
+    HwSgnXferR, // Halfword and signed, register offset
+    HwSgnXferI, // Halfword and signed, immediate offset
     Invalid,
 }
 
-const INST_MATCH_ORDER: [Instruction; 12] = [
-    Instruction::BranchEx,
+const INST_MATCH_ORDER: [Instruction; 14] = [
     Instruction::Branch,
+    Instruction::BranchEx,
     Instruction::PsrImm,
     Instruction::PsrReg,
-    Instruction::Multiply,
-    Instruction::MulLong,
     Instruction::DataProc0,
     Instruction::DataProc1,
     Instruction::DataProc2,
+    Instruction::Multiply,
+    Instruction::MulLong,
     Instruction::SingleXferI,
     Instruction::SingleXferR,
+    Instruction::HwSgnXferR,
+    Instruction::HwSgnXferI,
     Instruction::Invalid,
 ];
 
@@ -38,17 +42,19 @@ impl Instruction {
         use self::Instruction::*;
         #[cfg_attr(rustfmt, rustfmt_skip)]
         match *self {
-            BranchEx    => (0x0fffffd0, 0x012fff10),
+            BranchEx    => (0x0ffffff0, 0x012fff10),
             Branch      => (0x0e000000, 0x0a000000),
             DataProc0   => (0x0e000010, 0x00000000),
             DataProc1   => (0x0e000090, 0x00000010),
-            DataProc2   => (0x0e000000, 0x02000010),
+            DataProc2   => (0x0e000000, 0x02000000),
             PsrImm      => (0x0fb00000, 0x03200000),
             PsrReg      => (0x0f900ff0, 0x01000000),
             Multiply    => (0x0fc000f0, 0x00000090),
             MulLong     => (0x0f8000f0, 0x00800090),
             SingleXferI => (0x0e000000, 0x04000000),
             SingleXferR => (0x0e000010, 0x06000000),
+            HwSgnXferR  => (0x0e400f90, 0x00000090),
+            HwSgnXferI  => (0x0e400090, 0x00400090),
             Invalid     => (0x00000000, 0x00000000),
         }
     }
@@ -404,10 +410,13 @@ impl ArmIsaCpu for Cpu {
                     self.reg[rd] = res;
                 };
 
-                if w == 1 {
-                    // writeback
+                // post-indexing implies writeback
+                if p == 0 || w == 1 {
                     self.reg[rn] = post_addr;
                 }
+            }
+            HwSgnXferR | HwSgnXferI => {
+                panic!()
             }
             Invalid => return false,
         };
@@ -427,7 +436,6 @@ mod test {
     fn test_decode() {
         use super::Instruction::*;
 
-        // Instructions assembled by unicorn.js
         assert_eq!(BranchEx,    Instruction::decode(0xE12FFF1C));
         assert_eq!(Branch,      Instruction::decode(0xEB0000F8));
         assert_eq!(DataProc0,   Instruction::decode(0xE1A0816C));
@@ -438,6 +446,11 @@ mod test {
         assert_eq!(PsrReg,      Instruction::decode(0xE10FA000));
         assert_eq!(Multiply,    Instruction::decode(0x80040393));
         assert_eq!(MulLong,     Instruction::decode(0xE0834192));
+        assert_eq!(SingleXferI, Instruction::decode(0x85C67011));
+        assert_eq!(SingleXferR, Instruction::decode(0xB7965100));
+        assert_eq!(HwSgnXferR,  Instruction::decode(0xE10B00B1));
+        assert_eq!(HwSgnXferI,  Instruction::decode(0xE1EB10B4));
+        assert_eq!(Invalid,     Instruction::decode(0xEFDEAD10));
     }
 
     use std::sync::{Once, ONCE_INIT};
@@ -478,4 +491,9 @@ mod test {
                             (0x104, 0x200000e1),
                             (0x108, 0xe100001c)]);
     emutest!(emutest_arm3, [(0x100, 64)]);
+    emutest!(emutest_arm4, [(0x100, 6),
+                            (0x104, 0x200000e1),
+                            (0x108, 0xe100001c),
+                            (0x10c, 6),
+                            (0x110, 6*0x100)]);
 }
