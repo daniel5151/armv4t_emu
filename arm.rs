@@ -13,10 +13,12 @@ enum Instruction {
     PsrReg,
     Multiply,
     MulLong,
+    SingleXferI,
+    SingleXferR,
     Invalid,
 }
 
-const INST_MATCH_ORDER: [Instruction; 10] = [
+const INST_MATCH_ORDER: [Instruction; 12] = [
     Instruction::BranchEx,
     Instruction::Branch,
     Instruction::PsrImm,
@@ -26,6 +28,8 @@ const INST_MATCH_ORDER: [Instruction; 10] = [
     Instruction::DataProc0,
     Instruction::DataProc1,
     Instruction::DataProc2,
+    Instruction::SingleXferI,
+    Instruction::SingleXferR,
     Instruction::Invalid,
 ];
 
@@ -43,6 +47,8 @@ impl Instruction {
             PsrReg      => (0x0f900ff0, 0x01000000),
             Multiply    => (0x0fc000f0, 0x00000090),
             MulLong     => (0x0f8000f0, 0x00800090),
+            SingleXferI => (0x0e000000, 0x04000000),
+            SingleXferR => (0x0e000010, 0x06000000),
             Invalid     => (0x00000000, 0x00000000),
         }
     }
@@ -93,6 +99,37 @@ fn build_flags(v: u32, c: u32, z: u32, n: u32) -> u32 {
     (v & 1) << 0 | (c & 1) << 1 | (z & 1) << 2 | (n & 1) << 3
 }
 
+/// Compute the shifted value and shift carry when shift != 0
+fn arg_shift(val: u32, shift: u32, shift_type: u32) -> (u32, u32) {
+    debug_assert!(shift != 0);
+    match shift_type {
+        0 => shift_lsl(val, shift),
+        1 => shift_lsr(val, shift),
+        2 => shift_asr(val, shift),
+        3 => shift_ror(val, shift),
+        _ => panic!(),
+    }
+}
+
+/// Compute the shifted value and shift carry when shift == 0
+/// ARM has special logic encoded for when shift is 0, which requires
+/// the previous carry in some cases
+fn arg_shift0(val: u32, shift_type: u32, c: u32) -> (u32, u32) {
+    match shift_type {
+        0 /* LSL */ => (val, c),
+        1 /* LSR */ => shift_lsr(val, 32),
+        2 /* ASR */ => shift_asr(val, 32),
+        3 /* ROR */ => {
+            // in this case its RRX#1
+            // so we rotate right by one and shift the
+            // carry bit in
+            ((val >> 1) | (c << 31),
+             bit(val, 0))
+        },
+        _ => panic!(),
+    }
+}
+
 pub trait ArmIsaCpu {
     /// Executes one instruction and returns whether the CPU should continue
     /// executing.
@@ -112,7 +149,7 @@ impl ArmIsaCpu for Cpu {
 
         if !cond_met(cond, cpsr) {
             debug!("cond not met");
-            self.reg[reg::PC] += 4;
+            self.reg[reg::PC] = self.reg[reg::PC].wrapping_add(4);
             return true;
         }
 
@@ -135,9 +172,9 @@ impl ArmIsaCpu for Cpu {
                 // shift right by 6 (instead of 8) to multiply by 4
                 let s_offset = ((offset << 8) as i32 >> 6) as u32;
                 let old_pc = self.reg[reg::PC];
-                self.reg[reg::PC] = old_pc.wrapping_add(s_offset) + 4;
+                self.reg[reg::PC] = old_pc.wrapping_add(s_offset).wrapping_add(4);
                 if l != 0 {
-                    self.reg[reg::LR] = old_pc + 4;
+                    self.reg[reg::LR] = old_pc.wrapping_add(4);
                 }
             }
             DataProc0 | DataProc1 | DataProc2 => {
@@ -168,30 +205,12 @@ impl ArmIsaCpu for Cpu {
                         self.reg[rs] & 0xffu32
                     };
 
-                    let valm = self.reg[rm] + if rm == reg::PC { 8 + 4 * r } else { 0 };
+                    let valm = self.reg[rm].wrapping_add(((rm == reg::PC) as u32) * ( 8 + 4 * r ));
 
                     if r == 0 && shift == 0 {
-                        match shift_type {
-                            0 /* LSL */ => (valm, c),
-                            1 /* LSR */ => shift_lsr(valm, 32),
-                            2 /* ASR */ => shift_asr(valm, 32),
-                            3 /* ROR */ => {
-                                // in this case its RRX#1
-                                // so we rotate right by one and shift the
-                                // carry bit in
-                                ((valm >> 1) | (c << 31),
-                                 bit(valm, 0))
-                            },
-                            _ => panic!(),
-                        }
+                        arg_shift0(valm, shift_type, c)
                     } else if shift != 0 {
-                        match shift_type {
-                            0 => shift_lsl(valm, shift),
-                            1 => shift_lsr(valm, shift),
-                            2 => shift_asr(valm, shift),
-                            3 => shift_ror(valm, shift),
-                            _ => panic!(),
-                        }
+                        arg_shift(valm, shift, shift_type)
                     } else {
                         // [Rs] == 0, so we do nothing
                         (valm, c)
@@ -322,10 +341,77 @@ impl ArmIsaCpu for Cpu {
                     self.reg[reg::CPSR] = set(self.reg[reg::CPSR], 28, 4, new_flags);
                 }
             }
+            SingleXferI | SingleXferR => {
+                let p = bit(inst, 24);
+                let u = bit(inst, 23);
+                let b = bit(inst, 22);
+                let w = bit(inst, 21);
+                let l = bit(inst, 20);
+
+                let rn = extract(inst, 16, 4) as Reg;
+                let rd = extract(inst, 12, 4) as Reg;
+
+                let offset = if inst_type == SingleXferI {
+                    extract(inst, 0, 12)
+                } else {
+                    // We use the same logic here as for DataProc0
+                    let shift = extract(inst, 7, 5);
+                    let shift_type = extract(inst, 5, 2);
+
+                    let rm = extract(inst, 0, 4) as Reg;
+
+                    let valm = self.reg[rm];
+
+                    let (shifted, _) = if shift == 0 {
+                        let c = bit(cpsr, cpsr::C);
+                        arg_shift0(valm, shift_type, 0)
+                    } else {
+                        arg_shift(valm, shift, shift_type)
+                    };
+                    shifted
+                };
+
+                let base = self.reg[rn].wrapping_add(((rn == reg::PC) as u32) * 8);
+                let post_addr = if u == 0 {
+                    base.wrapping_sub(offset)
+                } else {
+                    base.wrapping_add(offset)
+                };
+
+                let addr = if p == 0 { base } else { post_addr };
+
+                if l == 0 {
+                    // store
+                    let val = self.reg[rd].wrapping_add(((rd == reg::PC) as u32) * 12);
+                    if b == 0 {
+                        // force alignment of the store
+                        self.mmu.set32(addr & !3, val);
+                    } else {
+                        self.mmu.set8(addr, val as u8);
+                    };
+                } else {
+                    let res = if b == 0 {
+                        let val = self.mmu.load32(addr & !3);
+                        // we need to rotate it so the addressed offset is
+                        // at the base
+                        let offset = addr & 3;
+                        val.rotate_right(offset * 8)
+                    } else {
+                        self.mmu.load8(addr) as u32
+                    };
+
+                    self.reg[rd] = res;
+                };
+
+                if w == 1 {
+                    // writeback
+                    self.reg[rn] = post_addr;
+                }
+            }
             Invalid => return false,
         };
 
-        self.reg[reg::PC] += 4;
+        self.reg[reg::PC] = self.reg[reg::PC].wrapping_add(4);
         true
     }
 }
