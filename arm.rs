@@ -17,10 +17,11 @@ enum Instruction {
     SingleXferR, // Single data transfer, register offset
     HwSgnXferR, // Halfword and signed, register offset
     HwSgnXferI, // Halfword and signed, immediate offset
+    BlockXfer,
     Invalid,
 }
 
-const INST_MATCH_ORDER: [Instruction; 14] = [
+const INST_MATCH_ORDER: [Instruction; 15] = [
     Instruction::Branch,
     Instruction::BranchEx,
     Instruction::PsrImm,
@@ -34,6 +35,7 @@ const INST_MATCH_ORDER: [Instruction; 14] = [
     Instruction::SingleXferR,
     Instruction::HwSgnXferR,
     Instruction::HwSgnXferI,
+    Instruction::BlockXfer,
     Instruction::Invalid,
 ];
 
@@ -55,6 +57,7 @@ impl Instruction {
             SingleXferR => (0x0e000010, 0x06000000),
             HwSgnXferR  => (0x0e400f90, 0x00000090),
             HwSgnXferI  => (0x0e400090, 0x00400090),
+            BlockXfer   => (0x0e000000, 0x08000000),
             Invalid     => (0x00000000, 0x00000000),
         }
     }
@@ -397,7 +400,7 @@ impl ArmIsaCpu for Cpu {
                         self.mmu.set8(addr, val as u8);
                     };
                 } else {
-                    let res = if b == 0 {
+                    self.reg[rd] = if b == 0 {
                         let val = self.mmu.load32(addr & !3);
                         // we need to rotate it so the addressed offset is
                         // at the base
@@ -406,8 +409,6 @@ impl ArmIsaCpu for Cpu {
                     } else {
                         self.mmu.load8(addr) as u32
                     };
-
-                    self.reg[rd] = res;
                 };
 
                 // post-indexing implies writeback
@@ -416,6 +417,58 @@ impl ArmIsaCpu for Cpu {
                 }
             }
             HwSgnXferR | HwSgnXferI => {
+                let p = bit(inst, 24);
+                let u = bit(inst, 23);
+                let w = bit(inst, 21);
+                let l = bit(inst, 20);
+
+                let s = bit(inst, 6);
+                let h = bit(inst, 5);
+
+                let rn = extract(inst, 16, 4) as Reg;
+                let rd = extract(inst, 12, 4) as Reg;
+
+                let offset = if inst_type == HwSgnXferR {
+                    let rn = extract(inst, 0, 4) as Reg;
+                    self.reg[rn]
+                } else {
+                    (extract(inst, 8, 4) << 4) | extract(inst, 0, 4)
+                };
+
+                let base = self.reg[rn].wrapping_add(((rn == reg::PC) as u32) * 8);
+                let post_addr = if u == 0 {
+                    base.wrapping_sub(offset)
+                } else {
+                    base.wrapping_add(offset)
+                };
+
+                let addr = if p == 0 { base } else { post_addr };
+
+                if l == 0 {
+                    // store
+                    debug_assert!(s == 0 && h == 1);
+                    let val = self.reg[rd].wrapping_add(((rd == reg::PC) as u32) * 12);
+                    self.mmu.set16(addr, val as u16);
+                } else {
+                    self.reg[rd] = match (s, h) {
+                        (0, 0) /* SWP */ => panic!(),
+                        (0, 1) /* halfword load */  => self.mmu.load16(addr) as u32,
+                        (1, 0) /* signed byte */    => {
+                            self.mmu.load8(addr) as i8 as i32 as u32
+                        },
+                        (1, 1) /* signed half */    => {
+                            self.mmu.load16(addr) as i16 as i32 as u32
+                        },
+                        _ => panic!()
+                    };
+                };
+
+                // post-indexing implies writeback
+                if p == 0 || w == 1 {
+                    self.reg[rn] = post_addr;
+                }
+            }
+            BlockXfer => {
                 panic!()
             }
             Invalid => return false,
@@ -450,6 +503,7 @@ mod test {
         assert_eq!(SingleXferR, Instruction::decode(0xB7965100));
         assert_eq!(HwSgnXferR,  Instruction::decode(0xE10B00B1));
         assert_eq!(HwSgnXferI,  Instruction::decode(0xE1EB10B4));
+        assert_eq!(BlockXfer,   Instruction::decode(0xE8BF8006));
         assert_eq!(Invalid,     Instruction::decode(0xEFDEAD10));
     }
 
@@ -496,4 +550,12 @@ mod test {
                             (0x108, 0xe100001c),
                             (0x10c, 6),
                             (0x110, 6*0x100)]);
+    emutest!(emutest_arm5, [(0x100, 0xf000),
+                            (0x104, 0xfff0),
+                            (0x108, 0x104)]);
+    emutest!(emutest_arm6, [(0x1f4, 0xa),
+                            (0x1f8, 0xc),
+                            (0x1fc, 0x10),
+                            (0x200, 6),
+                            (0x204, 0x200)]);
 }
