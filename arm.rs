@@ -439,6 +439,10 @@ mod test {
         assert_eq!(MulLong,     Instruction::decode(0xE0834192));
     }
 
+    use std::sync::{Once, ONCE_INIT};
+    static INIT: Once = ONCE_INIT;
+
+
     macro_rules! emutest {
         ($name:ident, $mem_checks: expr) => {
             #[test]
@@ -447,7 +451,8 @@ mod test {
 
                 use mmu::raw::Raw;
 
-                env_logger::init();
+                INIT.call_once(env_logger::init);
+
                 let prog = include_bytes!(concat!("testdata/",
                                                   stringify!($name),
                                                   ".bin"));
@@ -457,7 +462,7 @@ mod test {
 
                 let mem = cpu.memory();
                 for &(addr, val) in ($mem_checks).iter() {
-                    assert_eq!(val, mem.load32(addr));
+                    assert_eq!(val, mem.load32(addr), "addr: {:#010x}", addr);
                 }
             }
         }
@@ -465,4 +470,10 @@ mod test {
 
     emutest!(emutest_arm0, [(0x100, 5),
                             (0x104, 0)]);
+    emutest!(emutest_arm1, [(0x100, 5),
+                            (0x104, 5),
+                            (0x108, 5)]);
+    emutest!(emutest_arm2, [(0x100, 6),
+                            (0x104, 0x200000e1),
+                            (0x108, 0xe100001c)]);
 }
