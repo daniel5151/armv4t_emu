@@ -163,9 +163,10 @@ impl ArmIsaCpu for Cpu {
             cflags
         );
 
+        self.reg[reg::PC] = self.reg[reg::PC].wrapping_add(4);
+
         if !cond_met(cond, cpsr) {
             debug!("cond not met");
-            self.reg[reg::PC] = self.reg[reg::PC].wrapping_add(4);
             return true;
         }
 
@@ -187,10 +188,9 @@ impl ArmIsaCpu for Cpu {
                 // Shift up to sign extend
                 // shift right by 6 (instead of 8) to multiply by 4
                 let s_offset = ((offset << 8) as i32 >> 6) as u32;
-                let old_pc = self.reg[reg::PC];
-                self.reg[reg::PC] = old_pc.wrapping_add(s_offset).wrapping_add(4);
+                self.reg[reg::PC] = pc.wrapping_add(s_offset).wrapping_add(8);
                 if l != 0 {
-                    self.reg[reg::LR] = old_pc.wrapping_add(4);
+                    self.reg[reg::LR] = pc.wrapping_add(4);
                 }
             }
             DataProc0 | DataProc1 | DataProc2 => {
@@ -221,7 +221,7 @@ impl ArmIsaCpu for Cpu {
                         self.reg[rs] & 0xffu32
                     };
 
-                    let valm = self.reg[rm].wrapping_add(((rm == reg::PC) as u32) * (8 + 4 * r));
+                    let valm = self.reg[rm].wrapping_add(((rm == reg::PC) as u32) * (4 + 4 * r));
 
                     if r == 0 && shift == 0 {
                         arg_shift0(valm, shift_type, c)
@@ -237,12 +237,12 @@ impl ArmIsaCpu for Cpu {
                     shift_ror(imm, shift)
                 };
 
-                let valn = self.reg[rn] +
+                let valn = self.reg[rn].wrapping_add(
                     if rn == reg::PC {
-                        8 + 4 * (i == 0 && r == 1) as u32
+                        4 + 4 * (i == 0 && r == 1) as u32
                     } else {
                         0
-                    };
+                    });
 
                 // execute the instruction now
                 let (res, new_v, new_c) = match opcode {
@@ -387,7 +387,7 @@ impl ArmIsaCpu for Cpu {
                     shifted
                 };
 
-                let base = self.reg[rn].wrapping_add(((rn == reg::PC) as u32) * 8);
+                let base = self.reg[rn].wrapping_add(((rn == reg::PC) as u32) * 4);
                 let post_addr = if u == 0 {
                     base.wrapping_sub(offset)
                 } else {
@@ -398,7 +398,7 @@ impl ArmIsaCpu for Cpu {
 
                 if l == 0 {
                     // store
-                    let val = self.reg[rd].wrapping_add(((rd == reg::PC) as u32) * 12);
+                    let val = self.reg[rd].wrapping_add(((rd == reg::PC) as u32) * 8);
                     if b == 0 {
                         // force alignment of the store
                         self.mmu.set32(addr & !3, val);
@@ -441,7 +441,7 @@ impl ArmIsaCpu for Cpu {
                     (extract(inst, 8, 4) << 4) | extract(inst, 0, 4)
                 };
 
-                let base = self.reg[rn].wrapping_add(((rn == reg::PC) as u32) * 8);
+                let base = self.reg[rn].wrapping_add(((rn == reg::PC) as u32) * 4);
                 let post_addr = if u == 0 {
                     base.wrapping_sub(offset)
                 } else {
@@ -453,7 +453,7 @@ impl ArmIsaCpu for Cpu {
                 if l == 0 {
                     // store
                     debug_assert!(s == 0 && h == 1);
-                    let val = self.reg[rd].wrapping_add(((rd == reg::PC) as u32) * 12);
+                    let val = self.reg[rd].wrapping_add(((rd == reg::PC) as u32) * 8);
                     self.mmu.set16(addr, val as u16);
                 } else {
                     self.reg[rd] = match (s, h) {
@@ -474,11 +474,69 @@ impl ArmIsaCpu for Cpu {
                     self.reg[rn] = post_addr;
                 }
             }
-            BlockXfer => panic!(),
+            BlockXfer => {
+                let p = bit(inst, 24);
+                let u = bit(inst, 23);
+                let s = bit(inst, 22);
+                let w = bit(inst, 21);
+                let l = bit(inst, 20);
+
+                let rn = extract(inst, 16, 4) as Reg;
+
+                let reglist = extract(inst, 0, 16);
+
+                // FIXME: implement S bit correctly
+                // FIXME: if reglist is empty apparently theres weird behaviour
+                //        ignore this for now
+                let total = reglist.count_ones();
+
+                let orig_base = self.reg[rn];
+                let base = orig_base & !3;
+
+                let post_addr = if u == 0 {
+                    base.wrapping_sub(total * 4)
+                } else {
+                    base.wrapping_add(total * 4)
+                };
+
+                if w == 1 {
+                    self.reg[rn] = post_addr;
+                }
+
+                let addr = if u == 0 { post_addr } else { base };
+
+                // If we are going up, and pre-incrementing,
+                // or going down, and post-decrementing,
+                // then we will be using the range [addr+4, addr+total*4+4]
+                let pre_incr = (p == u) as u32;
+
+                let mut rem = reglist;
+                for i in 0..16 {
+                    if rem == 0 {
+                        break;
+                    }
+                    let r = rem.trailing_zeros() as Reg;
+                    let idx_addr = addr.wrapping_add((i + pre_incr) * 4);
+                    if l == 0 {
+                        // store
+                        let val = if r == reg::PC {
+                            pc.wrapping_add(12)
+                        } else if r == rn && w == 1 && i == 0 {
+                            orig_base
+                        } else {
+                            self.reg[r]
+                        };
+                        self.mmu.set32(idx_addr, val);
+                    } else {
+                        // load
+                        self.reg[r] = self.mmu.load32(idx_addr);
+                    };
+                    rem -= (1u32 << r);
+                };
+            },
             Invalid => return false,
         };
 
-        self.reg[reg::PC] = self.reg[reg::PC].wrapping_add(4);
         true
     }
 }
