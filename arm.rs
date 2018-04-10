@@ -143,9 +143,10 @@ impl ArmIsaCpu for Cpu {
         // Decode first
         let cond = extract(inst, 28, 4);
 
-        let cpsr = self.reg[reg::PC];
+        let cpsr = self.reg[reg::CPSR];
+        let cflags = extract(cpsr, 28, 4);
 
-        debug!("pc: {:#010x}, inst: {:#010x}, cond: {:#03x}", pc, inst, cond);
+        debug!("pc: {:#010x}, inst: {:#010x}, cond: {:#03x}, cflags: {:04b}", pc, inst, cond, cflags);
 
         if !cond_met(cond, cpsr) {
             debug!("cond not met");
@@ -476,4 +477,5 @@ mod test {
     emutest!(emutest_arm2, [(0x100, 6),
                             (0x104, 0x200000e1),
                             (0x108, 0xe100001c)]);
+    emutest!(emutest_arm3, [(0x100, 64)]);
 }
