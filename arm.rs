@@ -18,12 +18,15 @@ enum Instruction {
     HwSgnXferR, // Halfword and signed, register offset
     HwSgnXferI, // Halfword and signed, immediate offset
     BlockXfer,
-    Invalid,
+    Swap,
+    SoftwareInt,
+    Undefined,
 }
 
-const INST_MATCH_ORDER: [Instruction; 15] = [
+const INST_MATCH_ORDER: [Instruction; 17] = [
     Instruction::Branch,
     Instruction::BranchEx,
+    Instruction::Swap,
     Instruction::PsrImm,
     Instruction::PsrReg,
     Instruction::DataProc0,
@@ -36,7 +39,8 @@ const INST_MATCH_ORDER: [Instruction; 15] = [
     Instruction::HwSgnXferR,
     Instruction::HwSgnXferI,
     Instruction::BlockXfer,
-    Instruction::Invalid,
+    Instruction::SoftwareInt,
+    Instruction::Undefined,
 ];
 
 impl Instruction {
@@ -58,7 +62,9 @@ impl Instruction {
             HwSgnXferR  => (0x0e400f90, 0x00000090),
             HwSgnXferI  => (0x0e400090, 0x00400090),
             BlockXfer   => (0x0e000000, 0x08000000),
-            Invalid     => (0x00000000, 0x00000000),
+            Swap        => (0x0fb00ff0, 0x01000090),
+            SoftwareInt => (0x0f000000, 0x0f000000),
+            Undefined   => (0x00000000, 0x00000000),
         }
     }
 
@@ -69,12 +75,8 @@ impl Instruction {
                 return typ.clone();
             }
         }
-        Instruction::Invalid
+        Instruction::Undefined
     }
-}
-
-fn cond_code(inst: u32) -> u32 {
-    extract(inst, 28, 4)
 }
 
 fn cond_met(cond: u32, cpsr: u32) -> bool {
@@ -237,12 +239,11 @@ impl ArmIsaCpu for Cpu {
                     shift_ror(imm, shift)
                 };
 
-                let valn = self.reg[rn].wrapping_add(
-                    if rn == reg::PC {
-                        4 + 4 * (i == 0 && r == 1) as u32
-                    } else {
-                        0
-                    });
+                let valn = self.reg[rn].wrapping_add(if rn == reg::PC {
+                    4 + 4 * (i == 0 && r == 1) as u32
+                } else {
+                    0
+                });
 
                 // execute the instruction now
                 let (res, new_v, new_c) = match opcode {
@@ -380,7 +381,7 @@ impl ArmIsaCpu for Cpu {
 
                     let (shifted, _) = if shift == 0 {
                         let c = bit(cpsr, cpsr::C);
-                        arg_shift0(valm, shift_type, 0)
+                        arg_shift0(valm, shift_type, c)
                     } else {
                         arg_shift(valm, shift, shift_type)
                     };
@@ -477,7 +478,7 @@ impl ArmIsaCpu for Cpu {
             BlockXfer => {
                 let p = bit(inst, 24);
                 let u = bit(inst, 23);
-                let s = bit(inst, 22);
+                let _s = bit(inst, 22);
                 let w = bit(inst, 21);
                 let l = bit(inst, 20);
 
@@ -531,10 +532,39 @@ impl ArmIsaCpu for Cpu {
                         // load
                         self.reg[r] = self.mmu.load32(idx_addr);
                     };
-                    rem -= (1u32 << r);
+                    rem -= 1u32 << r;
+                }
+            }
+            Swap => {
+                let b = bit(inst, 22);
+
+                let rn = extract(inst, 16, 4) as Reg;
+                let rd = extract(inst, 12, 4) as Reg;
+                let rm = extract(inst, 0, 4) as Reg;
+
+                // If it is not a byte operation then force word align
+                let addr = self.reg[rn] & !((1-b) * 3);
+
+                let val = match b {
+                    0 => self.mmu.load32(addr),
+                    1 => self.mmu.load8(addr) as u32,
+                    _ => panic!()
                 };
-            },
-            Invalid => return false,
+                match b {
+                    0 => self.mmu.set32(addr, self.reg[rm]),
+                    1 => self.mmu.set8(addr, self.reg[rm] as u8),
+                    _ => panic!()
+                };
+
+                self.reg[rd] = val;
+            }
+            SoftwareInt => {
+                // FIXME: This is supposed to switch to supervisor mode
+                // I'm not convinced I can't just do this in software though
+                // Need to come back to this
+                panic!()
+            }
+            Undefined => return false,
         };
 
         true
@@ -566,7 +596,9 @@ mod test {
         assert_eq!(HwSgnXferR,  Instruction::decode(0xE10B00B1));
         assert_eq!(HwSgnXferI,  Instruction::decode(0xE1EB10B4));
         assert_eq!(BlockXfer,   Instruction::decode(0xE8BF8006));
-        assert_eq!(Invalid,     Instruction::decode(0xEFDEAD10));
+        assert_eq!(Swap,        Instruction::decode(0xE10D1090));
+        assert_eq!(SoftwareInt, Instruction::decode(0xEF000000));
+        assert_eq!(Undefined,   Instruction::decode(0xE7DEAD10));
     }
 
     use std::sync::{Once, ONCE_INIT};
@@ -628,5 +660,9 @@ mod test {
             (0x200, 6),
             (0x204, 0x200),
         ]
+    );
+    emutest!(
+        emutest_arm7,
+        [(0x1fc, 1), (0x200, 1), (0x204, 0x200)]
     );
 }
