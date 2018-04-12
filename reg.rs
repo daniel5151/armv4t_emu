@@ -5,6 +5,7 @@ pub type Reg = u8;
 
 const NUM_RGSR: Reg = 37;
 
+pub const SP: Reg = 13;
 pub const LR: Reg = 14;
 pub const PC: Reg = 15;
 pub const CPSR: Reg = 36;

@@ -285,7 +285,7 @@ impl ArmIsaCpu for Cpu {
             }
             PsrImm | PsrReg => {
                 // FIXME: requires SPSR registers and stuff
-                panic!();
+//                panic!();
             }
             Multiply => {
                 let a = bit(inst, 21);
