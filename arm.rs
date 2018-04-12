@@ -1,5 +1,6 @@
+use bit_util::*;
+
 use super::*;
-use super::bit_util::*;
 use super::reg::*;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -611,15 +612,15 @@ mod test {
             fn $name () {
                 use std::boxed::Box;
 
-                use mmu::raw::Raw;
+                use mmu::ram::Ram;
 
                 INIT.call_once(env_logger::init);
 
                 let prog = include_bytes!(concat!("testdata/",
                                                   stringify!($name),
                                                   ".bin"));
-                let mmu = Raw::new_with_data(0x1000, prog);
-                let mut cpu = super::Cpu::new(Box::new(mmu), 0x0);
+                let mmu = Ram::new_with_data(0x1000, prog);
+                let mut cpu = super::Cpu::new(Box::new(mmu), &[(reg::PC, 0x0u32)]);
                 cpu.run();
 
                 let mem = cpu.memory();

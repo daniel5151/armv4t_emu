@@ -1,30 +1,38 @@
 use std::boxed::Box;
 use std::default::Default;
+use std::iter::IntoIterator;
 
 use super::mmu::Mmu;
 
 mod arm;
-mod bit_util;
-mod reg;
+pub mod reg;
+
+use self::reg::*;
 
 pub struct Cpu {
-    reg: reg::RegFile,
+    reg: RegFile,
     mmu: Box<Mmu>,
 }
 
 impl Cpu {
-    pub fn new(mmu: Box<Mmu>, start_pc: u32) -> Cpu {
+    pub fn new<'a, I>(mmu: Box<Mmu>, regs: I) -> Cpu
+        where I: IntoIterator<Item = &'a (Reg, u32)>
+    {
         let mut cpu = Cpu {
             reg: Default::default(),
             mmu: mmu,
         };
-        cpu.init(start_pc);
+        cpu.init(regs);
 
         cpu
     }
 
-    fn init(&mut self, start_pc: u32) {
-        self.reg[reg::PC] = start_pc;
+    fn init<'a, I>(&mut self, regs: I)
+        where I: IntoIterator<Item = &'a (Reg, u32)>
+    {
+        for &(reg, val) in regs.into_iter() {
+            self.reg[reg] = val;
+        }
     }
 
     pub fn run(&mut self) {
