@@ -33,6 +33,9 @@ impl Cpu {
         for &(reg, val) in regs.into_iter() {
             self.reg[reg] = val;
         }
+
+        // init cpsr
+        self.reg[reg::CPSR] = 0x10;
     }
 
     pub fn run(&mut self) {

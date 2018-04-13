@@ -285,7 +285,37 @@ impl ArmIsaCpu for Cpu {
             }
             PsrImm | PsrReg => {
                 // FIXME: requires SPSR registers and stuff
-//                panic!();
+                let p = bit(inst, 22);
+                let rs = if p == 0 { reg::CPSR } else { reg::SPSR };
+
+                let op = bit(inst, 21);
+
+                if op == 0 {
+                    // Move psr to rd
+                    let rd = extract(inst, 12, 4) as Reg;
+                    self.reg[rd] = self.reg[rs];
+                } else {
+                    let i = bit(inst, 26);
+                    let f = bit(inst, 19);
+                    let c = bit(inst, 16);
+
+                    // user mode can't change the control bits
+                    let ctrl = ((self.reg.mode() != 0x10) as u32) * c;
+
+                    let mask = 0xf0000000 * f + 0x000000ff * c;
+
+                    let val = if i == 0 {
+                        let rm = extract(inst, 0, 4) as Reg;
+                        self.reg[rm]
+                    } else {
+                        let rot = extract(inst, 8, 4) * 2;
+                        let imm = extract(inst, 0, 8);
+                        imm.rotate_right(rot)
+                    };
+
+                    let cur = self.reg[rs];
+                    self.reg[rs] = (cur & !mask) | val & mask;
+                };
             }
             Multiply => {
                 let a = bit(inst, 21);
