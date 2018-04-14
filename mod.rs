@@ -5,6 +5,8 @@ use std::iter::IntoIterator;
 use super::mmu::Mmu;
 
 mod arm;
+mod thumb;
+mod util;
 pub mod reg;
 
 use self::reg::*;

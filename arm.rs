@@ -2,6 +2,7 @@ use bit_util::*;
 
 use super::*;
 use super::reg::*;
+use super::util::*;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum Instruction {
@@ -80,68 +81,6 @@ impl Instruction {
     }
 }
 
-fn cond_met(cond: u32, cpsr: u32) -> bool {
-    let z = bit(cpsr, cpsr::Z);
-    let c = bit(cpsr, cpsr::C);
-    let v = bit(cpsr, cpsr::V);
-    let n = bit(cpsr, cpsr::N);
-
-    match cond {
-        0x0 => z == 1,
-        0x1 => z == 0,
-        0x2 => c == 1,
-        0x3 => c == 0,
-        0x4 => n == 1,
-        0x5 => n == 0,
-        0x6 => v == 1,
-        0x7 => v == 0,
-        0x8 => c == 1 && z == 0,
-        0x9 => c == 0 || z == 1,
-        0xA => n == v,
-        0xB => n != v,
-        0xC => z == 0 && n == v,
-        0xD => z == 1 || n != v,
-        0xE => true,
-        0xF => true, /* reserved, default to execute */
-        _ => panic!(),
-    }
-}
-
-fn build_flags(v: u32, c: u32, z: u32, n: u32) -> u32 {
-    (v & 1) << 0 | (c & 1) << 1 | (z & 1) << 2 | (n & 1) << 3
-}
-
-/// Compute the shifted value and shift carry when shift != 0
-fn arg_shift(val: u32, shift: u32, shift_type: u32) -> (u32, u32) {
-    debug_assert!(shift != 0);
-    match shift_type {
-        0 => shift_lsl(val, shift),
-        1 => shift_lsr(val, shift),
-        2 => shift_asr(val, shift),
-        3 => shift_ror(val, shift),
-        _ => panic!(),
-    }
-}
-
-/// Compute the shifted value and shift carry when shift == 0
-/// ARM has special logic encoded for when shift is 0, which requires
-/// the previous carry in some cases
-fn arg_shift0(val: u32, shift_type: u32, c: u32) -> (u32, u32) {
-    match shift_type {
-        0 /* LSL */ => (val, c),
-        1 /* LSR */ => shift_lsr(val, 32),
-        2 /* ASR */ => shift_asr(val, 32),
-        3 /* ROR */ => {
-            // in this case its RRX#1
-            // so we rotate right by one and shift the
-            // carry bit in
-            ((val >> 1) | (c << 31),
-             bit(val, 0))
-        },
-        _ => panic!(),
-    }
-}
-
 pub trait ArmIsaCpu {
     /// Executes one instruction and returns whether the CPU should continue
     /// executing.
@@ -159,7 +98,7 @@ impl ArmIsaCpu for Cpu {
         let cflags = extract(cpsr, 28, 4);
 
         debug!(
-            "pc: {:#010x}, inst: {:#010x}, cond: {:#03x}, cflags: {:04b}",
+            "ARM: pc: {:#010x}, inst: {:#010x}, cond: {:#03x}, cflags: {:04b}",
             pc,
             inst,
             cond,
@@ -268,13 +207,13 @@ impl ArmIsaCpu for Cpu {
                 };
 
                 if s == 1 {
-                    if true || rd != reg::PC {
+                    if rd != reg::PC {
                         let new_z = (res == 0) as u32;
                         let new_n = is_neg(res) as u32;
                         let new_flags = build_flags(new_v, new_c, new_z, new_n);
                         self.reg[reg::CPSR] = set(self.reg[reg::CPSR], 28, 4, new_flags);
                     } else {
-                        // FIXME: do SPSR registers
+                        self.reg[reg::CPSR] = self.reg[reg::SPSR];
                     }
                 }
 
@@ -284,7 +223,6 @@ impl ArmIsaCpu for Cpu {
                 }
             }
             PsrImm | PsrReg => {
-                // FIXME: requires SPSR registers and stuff
                 let p = bit(inst, 22);
                 let rs = if p == 0 { reg::CPSR } else { reg::SPSR };
 
@@ -302,7 +240,7 @@ impl ArmIsaCpu for Cpu {
                     // user mode can't change the control bits
                     let ctrl = ((self.reg.mode() != 0x10) as u32) * c;
 
-                    let mask = 0xf0000000 * f + 0x000000ff * c;
+                    let mask = 0xf0000000 * f + 0x000000ff * ctrl;
 
                     let val = if i == 0 {
                         let rm = extract(inst, 0, 4) as Reg;
