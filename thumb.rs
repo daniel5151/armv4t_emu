@@ -405,7 +405,7 @@ impl ThumbIsaCpu for Cpu {
                     1 << (if l == 0 { reg::LR } else { reg::PC })
                 } else { 0 };
 
-                for i in 0..16 {
+                for i in 0..total {
                     let reg = rem.trailing_zeros() as Reg;
                     let idx_addr = addr.wrapping_add(i * 4);
                     if l == 0 {
@@ -432,7 +432,7 @@ impl ThumbIsaCpu for Cpu {
                 self.reg[rb] = base.wrapping_add(total * 4);
 
                 let mut rem = rlist;
-                for i in 0..8 {
+                for i in 0..total {
                     let reg = rem.trailing_zeros() as Reg;
                     let idx_addr = base.wrapping_add(i * 4);
 
@@ -487,4 +487,59 @@ impl ThumbIsaCpu for Cpu {
 
         true
     }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    #[cfg_attr(rustfmt, rustfmt_skip)]
+    fn test_decode() {
+        use super::Instruction::*;
+
+        macro_rules! check (
+            ($inst: expr, $val: expr) => {
+                assert_eq!($inst, Instruction::decode($val));
+            }
+        );
+        check!(Shifted,     0x0fb4);
+        check!(AddSub,      0x1c0a);
+        check!(ImmOp,       0x200a);
+        check!(AluOp,       0x4042);
+        check!(HiRegBx,     0x466c);
+        check!(PushPop,     0xb407);
+        check!(Undefined,   0xe800);
+    }
+
+    macro_rules! emutest {
+        ($name:ident, $mem_checks: expr) => {
+            #[test]
+            fn $name () {
+                use std::boxed::Box;
+
+                use mmu::ram::Ram;
+
+                use test;
+                test::setup();
+
+                let prog = include_bytes!(concat!("testdata/",
+                                                  stringify!($name),
+                                                  ".bin"));
+                let mmu = Ram::new_with_data(0x1000, prog);
+                let mut cpu = super::Cpu::new(Box::new(mmu),
+                    // Start at 0, with a stack pointer, and in thumb mode
+                    &[(reg::PC, 0x0u32),
+                      (reg::SP, 0x200)]);
+                cpu.set_thumb_mode(true);
+                cpu.run();
+
+                let mem = cpu.memory();
+                for &(addr, val) in ($mem_checks).iter() {
+                    assert_eq!(val, mem.load32(addr), "addr: {:#010x}", addr);
+                }
+            }
+        }
+    }
+
+    emutest!(emutest_thm0, [(0x1ec, 10)]);
 }

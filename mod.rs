@@ -32,20 +32,38 @@ impl Cpu {
     fn init<'a, I>(&mut self, regs: I)
         where I: IntoIterator<Item = &'a (Reg, u32)>
     {
+        // init cpsr mode
+        self.reg.set(0, reg::CPSR, 0x10);
         for &(reg, val) in regs.into_iter() {
             self.reg[reg] = val;
         }
-
-        // init cpsr
-        self.reg[reg::CPSR] = 0x10;
     }
 
     pub fn run(&mut self) {
         use self::arm::ArmIsaCpu;
-        while self.execute() {}
+        use self::thumb::ThumbIsaCpu;
+
+        let mut run = true;
+        while run {
+            run = if !self.thumb_mode() {
+                ArmIsaCpu::execute(self)
+            } else {
+                ThumbIsaCpu::execute(self)
+            }
+        }
     }
 
     pub fn memory(&self) -> &Mmu {
         &*self.mmu
+    }
+
+    pub fn set_thumb_mode(&mut self, thumb: bool) {
+        let mask = 1u32 << cpsr::T;
+        let cpsr = self.reg[reg::CPSR];
+        self.reg[reg::CPSR] = (cpsr & !mask) | ((thumb as u32) * mask);
+    }
+
+    fn thumb_mode(&self) -> bool {
+        (self.reg[reg::CPSR] & (1u32 << cpsr::T)) != 0
     }
 }

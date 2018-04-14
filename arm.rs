@@ -542,37 +542,36 @@ impl ArmIsaCpu for Cpu {
 
 #[cfg(test)]
 mod test {
-    use env_logger;
-
     use super::*;
     #[test]
     #[cfg_attr(rustfmt, rustfmt_skip)]
     fn test_decode() {
         use super::Instruction::*;
 
-        assert_eq!(BranchEx,    Instruction::decode(0xE12FFF1C));
-        assert_eq!(Branch,      Instruction::decode(0xEB0000F8));
-        assert_eq!(DataProc0,   Instruction::decode(0xE1A0816C));
-        assert_eq!(DataProc1,   Instruction::decode(0xE0923011));
-        assert_eq!(DataProc1,   Instruction::decode(0xC0923011));
-        assert_eq!(DataProc2,   Instruction::decode(0xE2A23AFF));
-        assert_eq!(PsrImm,      Instruction::decode(0x1329F000));
-        assert_eq!(PsrReg,      Instruction::decode(0xE10FA000));
-        assert_eq!(Multiply,    Instruction::decode(0x80040393));
-        assert_eq!(MulLong,     Instruction::decode(0xE0834192));
-        assert_eq!(SingleXferI, Instruction::decode(0x85C67011));
-        assert_eq!(SingleXferR, Instruction::decode(0xB7965100));
-        assert_eq!(HwSgnXferR,  Instruction::decode(0xE10B00B1));
-        assert_eq!(HwSgnXferI,  Instruction::decode(0xE1EB10B4));
-        assert_eq!(BlockXfer,   Instruction::decode(0xE8BF8006));
-        assert_eq!(Swap,        Instruction::decode(0xE10D1090));
-        assert_eq!(SoftwareInt, Instruction::decode(0xEF000000));
-        assert_eq!(Undefined,   Instruction::decode(0xE7DEAD10));
+        macro_rules! check (
+            ($inst: expr, $val: expr) => {
+                assert_eq!($inst, Instruction::decode($val));
+            }
+        );
+        check!(BranchEx,    0xE12FFF1C);
+        check!(Branch,      0xEB0000F8);
+        check!(DataProc0,   0xE1A0816C);
+        check!(DataProc1,   0xE0923011);
+        check!(DataProc1,   0xC0923011);
+        check!(DataProc2,   0xE2A23AFF);
+        check!(PsrImm,      0x1329F000);
+        check!(PsrReg,      0xE10FA000);
+        check!(Multiply,    0x80040393);
+        check!(MulLong,     0xE0834192);
+        check!(SingleXferI, 0x85C67011);
+        check!(SingleXferR, 0xB7965100);
+        check!(HwSgnXferR,  0xE10B00B1);
+        check!(HwSgnXferI,  0xE1EB10B4);
+        check!(BlockXfer,   0xE8BF8006);
+        check!(Swap,        0xE10D1090);
+        check!(SoftwareInt, 0xEF000000);
+        check!(Undefined,   0xE7DEAD10);
     }
-
-    use std::sync::{Once, ONCE_INIT};
-    static INIT: Once = ONCE_INIT;
-
 
     macro_rules! emutest {
         ($name:ident, $mem_checks: expr) => {
@@ -582,7 +581,8 @@ mod test {
 
                 use mmu::ram::Ram;
 
-                INIT.call_once(env_logger::init);
+                use test;
+                test::setup();
 
                 let prog = include_bytes!(concat!("testdata/",
                                                   stringify!($name),
