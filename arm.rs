@@ -512,17 +512,17 @@ impl ArmIsaCpu for Cpu {
                 let rm = extract(inst, 0, 4) as Reg;
 
                 // If it is not a byte operation then force word align
-                let addr = self.reg[rn] & !((1-b) * 3);
+                let addr = self.reg[rn] & !((1 - b) * 3);
 
                 let val = match b {
                     0 => self.mmu.load32(addr),
                     1 => self.mmu.load8(addr) as u32,
-                    _ => panic!()
+                    _ => panic!(),
                 };
                 match b {
                     0 => self.mmu.set32(addr, self.reg[rm]),
                     1 => self.mmu.set8(addr, self.reg[rm] as u8),
-                    _ => panic!()
+                    _ => panic!(),
                 };
 
                 self.reg[rd] = val;
@@ -630,8 +630,5 @@ mod test {
             (0x204, 0x200),
         ]
     );
-    emutest!(
-        emutest_arm7,
-        [(0x1fc, 1), (0x200, 1), (0x204, 0x200)]
-    );
+    emutest!(emutest_arm7, [(0x1fc, 1), (0x200, 1), (0x204, 0x200)]);
 }

@@ -18,7 +18,8 @@ pub struct Cpu {
 
 impl Cpu {
     pub fn new<'a, I>(mmu: Box<Mmu>, regs: I) -> Cpu
-        where I: IntoIterator<Item = &'a (Reg, u32)>
+    where
+        I: IntoIterator<Item = &'a (Reg, u32)>,
     {
         let mut cpu = Cpu {
             reg: Default::default(),
@@ -30,7 +31,8 @@ impl Cpu {
     }
 
     fn init<'a, I>(&mut self, regs: I)
-        where I: IntoIterator<Item = &'a (Reg, u32)>
+    where
+        I: IntoIterator<Item = &'a (Reg, u32)>,
     {
         // init cpsr mode
         self.reg.set(0, reg::CPSR, 0x10);

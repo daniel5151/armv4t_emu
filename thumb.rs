@@ -151,11 +151,7 @@ impl ThumbIsaCpu for Cpu {
                 let rd = extract(inst, 0, 3) as Reg;
 
                 let rn = extract(inst, 6, 3) as Reg;
-                let val2 = if i == 0 {
-                    self.reg[rn]
-                } else {
-                    rn as u32
-                };
+                let val2 = if i == 0 { self.reg[rn] } else { rn as u32 };
 
                 let (res, new_v, new_c) = match op {
                     0 => add_flags(self.reg[rs], val2, 0),
@@ -264,9 +260,7 @@ impl ThumbIsaCpu for Cpu {
                 let rd = extract(inst, 8, 3) as Reg;
                 let offset = extract(inst, 0, 8);
 
-                let addr = self.reg[reg::PC]
-                    .wrapping_add(2)
-                    .wrapping_add(offset * 4) & !3;
+                let addr = self.reg[reg::PC].wrapping_add(2).wrapping_add(offset * 4) & !3;
 
                 self.reg[rd] = self.mmu.load32(addr);
             }
@@ -401,9 +395,12 @@ impl ThumbIsaCpu for Cpu {
 
                 let addr = if l == 0 { post_addr } else { base };
 
-                let mut rem = rlist | if r == 1 {
-                    1 << (if l == 0 { reg::LR } else { reg::PC })
-                } else { 0 };
+                let mut rem = rlist |
+                    if r == 1 {
+                        1 << (if l == 0 { reg::LR } else { reg::PC })
+                    } else {
+                        0
+                    };
 
                 for i in 0..total {
                     let reg = rem.trailing_zeros() as Reg;
@@ -474,9 +471,9 @@ impl ThumbIsaCpu for Cpu {
                 let offset = extract(inst, 0, 11);
 
                 if h == 0 {
-                    self.reg[reg::LR] = pc
-                        .wrapping_add(4)
-                        .wrapping_add(sign_extend(offset << 12, 23));
+                    self.reg[reg::LR] = pc.wrapping_add(4).wrapping_add(
+                        sign_extend(offset << 12, 23),
+                    );
                 } else {
                     self.reg[reg::PC] = self.reg[reg::LR].wrapping_add(offset << 1);
                     self.reg[reg::LR] = pc.wrapping_add(2) | 1;
