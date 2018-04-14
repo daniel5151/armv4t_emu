@@ -452,7 +452,7 @@ impl ThumbIsaCpu for Cpu {
                 let offset = extract(inst, 0, 8) as i8 as i32 as u32;
 
                 if cond_met(cond, cpsr) {
-                    self.reg[reg::PC] = pc.wrapping_add(4).wrapping_add(offset);
+                    self.reg[reg::PC] = pc.wrapping_add(4).wrapping_add(offset << 1);
                 }
             }
             SoftwareInt => {
@@ -504,7 +504,19 @@ mod test {
         check!(ImmOp,       0x200a);
         check!(AluOp,       0x4042);
         check!(HiRegBx,     0x466c);
+        check!(PcLoad,      0x4d00);
+        check!(SingleXferR, 0x5045);
+        check!(HwSgnXfer,   0x5fb9);
+        check!(SingleXferI, 0x7078);
+        check!(HwXferI,     0x80b9);
+        check!(SpXfer,      0x9102);
+        check!(LoadAddr,    0xa001);
+        check!(SpAdd,       0xb082);
         check!(PushPop,     0xb407);
+        check!(BlockXfer,   0xc103);
+        check!(CondBranch,  0xd1fb);
+        check!(Branch,      0xe002);
+        check!(LongBranch,  0xf801);
         check!(Undefined,   0xe800);
     }
 
@@ -538,5 +550,9 @@ mod test {
         }
     }
 
-    emutest!(emutest_thm0, [(0x1ec, 10)]);
+    emutest!(emutest_thm0, [(0x1ec, 10), (0x1f0, 15), (0x1f4, 5), (0x1f8, 60), (0x1fc, 0x200)]);
+    emutest!(emutest_thm1, [(0x200, 0xdeadbeef)]);
+    emutest!(emutest_thm2, [(0x200, 0xff00), (0x204, 0xff80), (0x208, 0x7fffff80)]);
+    emutest!(emutest_thm3, [(0x1f8, 8), (0x1fc, 0x200), (0x200, 64)]);
+    emutest!(emutest_thm4, [(0x200, 4), (0x204, 5)]);
 }
