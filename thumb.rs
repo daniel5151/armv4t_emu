@@ -459,7 +459,7 @@ impl ThumbIsaCpu for Cpu {
                 // FIXME: This is supposed to switch to supervisor mode
                 // I'm not convinced I can't just do this in software though
                 // Need to come back to this
-                panic!()
+                unimplemented!()
             }
             Branch => {
                 let offset = sign_extend(extract(inst, 0, 11) << 1, 12);
@@ -542,7 +542,7 @@ mod test {
                 cpu.set_thumb_mode(true);
                 cpu.run();
 
-                let mem = cpu.memory();
+                let mem = &cpu.mmu;
                 for &(addr, val) in ($mem_checks).iter() {
                     assert_eq!(val, mem.load32(addr), "addr: {:#010x}", addr);
                 }
@@ -550,9 +550,21 @@ mod test {
         }
     }
 
-    emutest!(emutest_thm0, [(0x1ec, 10), (0x1f0, 15), (0x1f4, 5), (0x1f8, 60), (0x1fc, 0x200)]);
+    emutest!(
+        emutest_thm0,
+        [
+            (0x1ec, 10),
+            (0x1f0, 15),
+            (0x1f4, 5),
+            (0x1f8, 60),
+            (0x1fc, 0x200),
+        ]
+    );
     emutest!(emutest_thm1, [(0x200, 0xdeadbeef)]);
-    emutest!(emutest_thm2, [(0x200, 0xff00), (0x204, 0xff80), (0x208, 0x7fffff80)]);
+    emutest!(
+        emutest_thm2,
+        [(0x200, 0xff00), (0x204, 0xff80), (0x208, 0x7fffff80)]
+    );
     emutest!(emutest_thm3, [(0x1f8, 8), (0x1fc, 0x200), (0x200, 64)]);
     emutest!(emutest_thm4, [(0x200, 4), (0x204, 5)]);
 }

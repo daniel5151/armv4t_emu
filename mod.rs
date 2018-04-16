@@ -34,8 +34,8 @@ impl Cpu {
     where
         I: IntoIterator<Item = &'a (Reg, u32)>,
     {
-        // init cpsr mode
-        self.reg.set(0, reg::CPSR, 0x10);
+        // start in system mode
+        self.reg.set(0, reg::CPSR, 0x1F);
         for &(reg, val) in regs.into_iter() {
             self.reg[reg] = val;
         }
@@ -53,10 +53,6 @@ impl Cpu {
                 ThumbIsaCpu::execute(self)
             }
         }
-    }
-
-    pub fn memory(&self) -> &Mmu {
-        &*self.mmu
     }
 
     pub fn set_thumb_mode(&mut self, thumb: bool) {

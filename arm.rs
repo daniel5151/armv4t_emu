@@ -531,7 +531,7 @@ impl ArmIsaCpu for Cpu {
                 // FIXME: This is supposed to switch to supervisor mode
                 // I'm not convinced I can't just do this in software though
                 // Need to come back to this
-                panic!()
+                unimplemented!()
             }
             Undefined => return false,
         };
@@ -591,7 +591,7 @@ mod test {
                 let mut cpu = super::Cpu::new(Box::new(mmu), &[(reg::PC, 0x0u32)]);
                 cpu.run();
 
-                let mem = cpu.memory();
+                let mem = &cpu.mmu;
                 for &(addr, val) in ($mem_checks).iter() {
                     assert_eq!(val, mem.load32(addr), "addr: {:#010x}", addr);
                 }
