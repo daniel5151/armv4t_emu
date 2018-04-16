@@ -90,14 +90,10 @@ impl Instruction {
     }
 }
 
-pub trait ThumbIsaCpu {
+impl<T: Mmu> Cpu<T> {
     /// Executes one instruction and returns whether the CPU should continue
     /// executing.
-    fn execute(&mut self) -> bool;
-}
-
-impl ThumbIsaCpu for Cpu {
-    fn execute(&mut self) -> bool {
+    pub fn execute_thumb(&mut self) -> bool {
         let pc = self.reg[reg::PC];
         let inst = self.mmu.load16(pc & !1) as u32;
         let cpsr = self.reg[reg::CPSR];
@@ -524,8 +520,6 @@ mod test {
         ($name:ident, $mem_checks: expr) => {
             #[test]
             fn $name () {
-                use std::boxed::Box;
-
                 use mmu::ram::Ram;
 
                 use test;
@@ -534,8 +528,8 @@ mod test {
                 let prog = include_bytes!(concat!("testdata/",
                                                   stringify!($name),
                                                   ".bin"));
-                let mmu = Ram::new_with_data(0x1000, prog);
-                let mut cpu = super::Cpu::new(Box::new(mmu),
+                let mut mmu = Ram::new_with_data(0x1000, prog);
+                let mut cpu = super::Cpu::new(Shared::new(&mut mmu),
                     // Start at 0, with a stack pointer, and in thumb mode
                     &[(reg::PC, 0x0u32),
                       (reg::SP, 0x200)]);

@@ -2,7 +2,9 @@ use std::boxed::Box;
 use std::default::Default;
 use std::iter::IntoIterator;
 
-use super::mmu::Mmu;
+use shared::Shared;
+
+use mmu::Mmu;
 
 mod arm;
 mod thumb;
@@ -11,13 +13,13 @@ pub mod reg;
 
 use self::reg::*;
 
-pub struct Cpu {
+pub struct Cpu<T: Mmu> {
     reg: RegFile,
-    mmu: Box<Mmu>,
+    mmu: Shared<T>,
 }
 
-impl Cpu {
-    pub fn new<'a, I>(mmu: Box<Mmu>, regs: I) -> Cpu
+impl<T: Mmu> Cpu<T> {
+    pub fn new<'a, I>(mmu: Shared<T>, regs: I) -> Cpu<T>
     where
         I: IntoIterator<Item = &'a (Reg, u32)>,
     {
@@ -42,15 +44,12 @@ impl Cpu {
     }
 
     pub fn run(&mut self) {
-        use self::arm::ArmIsaCpu;
-        use self::thumb::ThumbIsaCpu;
-
         let mut run = true;
         while run {
             run = if !self.thumb_mode() {
-                ArmIsaCpu::execute(self)
+                self.execute_arm()
             } else {
-                ThumbIsaCpu::execute(self)
+                self.execute_thumb()
             }
         }
     }

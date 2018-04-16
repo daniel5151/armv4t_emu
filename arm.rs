@@ -81,14 +81,10 @@ impl Instruction {
     }
 }
 
-pub trait ArmIsaCpu {
+impl<T: Mmu> Cpu<T> {
     /// Executes one instruction and returns whether the CPU should continue
     /// executing.
-    fn execute(&mut self) -> bool;
-}
-
-impl ArmIsaCpu for Cpu {
-    fn execute(&mut self) -> bool {
+    pub fn execute_arm(&mut self) -> bool {
         let pc = self.reg[reg::PC];
         let inst = self.mmu.load32(pc);
         // Decode first
@@ -577,8 +573,6 @@ mod test {
         ($name:ident, $mem_checks: expr) => {
             #[test]
             fn $name () {
-                use std::boxed::Box;
-
                 use mmu::ram::Ram;
 
                 use test;
@@ -587,8 +581,8 @@ mod test {
                 let prog = include_bytes!(concat!("testdata/",
                                                   stringify!($name),
                                                   ".bin"));
-                let mmu = Ram::new_with_data(0x1000, prog);
-                let mut cpu = super::Cpu::new(Box::new(mmu), &[(reg::PC, 0x0u32)]);
+                let mut mmu = Ram::new_with_data(0x1000, prog);
+                let mut cpu = super::Cpu::new(Shared::new(&mut mmu), &[(reg::PC, 0x0u32)]);
                 cpu.run();
 
                 let mem = &cpu.mmu;
