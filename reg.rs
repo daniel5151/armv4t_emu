@@ -46,10 +46,12 @@ pub struct RegFile {
 }
 
 impl RegFile {
+    #[inline]
     pub fn mode(&self) -> u32 {
         extract(self.reg[CPSR as usize], 0, 5)
     }
 
+    #[inline]
     pub fn bank(&self) -> usize {
         match self.mode() {
             0x10 => 0, // user
@@ -66,10 +68,12 @@ impl RegFile {
         }
     }
 
+    #[inline]
     pub fn set(&mut self, bank: usize, reg: Reg, val: u32) {
         self.reg[REG_MAP[bank][reg as usize]] = val;
     }
 
+    #[inline]
     pub fn get(&self, bank: usize, reg: Reg) -> u32 {
         self.reg[REG_MAP[bank][reg as usize]]
     }

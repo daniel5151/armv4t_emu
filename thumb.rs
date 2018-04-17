@@ -29,6 +29,7 @@ enum Instruction {
 }
 
 const INST_MATCH_ORDER: [Instruction; 20] = [
+    Instruction::Branch,
     Instruction::AddSub,
     Instruction::AluOp,
     Instruction::Shifted,
@@ -46,12 +47,12 @@ const INST_MATCH_ORDER: [Instruction; 20] = [
     Instruction::BlockXfer,
     Instruction::CondBranch,
     Instruction::SoftwareInt,
-    Instruction::Branch,
     Instruction::LongBranch,
     Instruction::Undefined,
 ];
 
 impl Instruction {
+    #[inline]
     fn pattern(&self) -> (u16, u16) {
         use self::Instruction::*;
         #[cfg_attr(rustfmt, rustfmt_skip)]
