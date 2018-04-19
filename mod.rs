@@ -46,15 +46,15 @@ impl<T: Mmu> Cpu<T> {
     pub fn run(&mut self) {
         let mut run = true;
         while run {
-            self.cycle();
+            run = self.cycle();
         }
     }
 
-    pub fn cycle(&mut self) {
+    pub fn cycle(&mut self) -> bool {
         if !self.thumb_mode() {
-            self.execute_arm();
+            self.execute_arm()
         } else {
-            self.execute_thumb();
+            self.execute_thumb()
         }
     }
 
