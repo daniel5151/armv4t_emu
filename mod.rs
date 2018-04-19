@@ -1,4 +1,3 @@
-use std::boxed::Box;
 use std::default::Default;
 use std::iter::IntoIterator;
 
