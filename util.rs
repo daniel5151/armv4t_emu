@@ -11,7 +11,7 @@ pub fn arg_shift(val: u32, shift: u32, shift_type: u32) -> (u32, u32) {
         1 => shift_lsr(val, shift),
         2 => shift_asr(val, shift),
         3 => shift_ror(val, shift),
-        _ => panic!(),
+        _ => unreachable!(),
     }
 }
 
@@ -31,7 +31,7 @@ pub fn arg_shift0(val: u32, shift_type: u32, c: u32) -> (u32, u32) {
             ((val >> 1) | (c << 31),
              bit(val, 0))
         },
-        _ => panic!(),
+        _ => unreachable!(),
     }
 }
 
@@ -63,6 +63,6 @@ pub fn cond_met(cond: u32, cpsr: u32) -> bool {
         0xD => z == 1 || n != v,
         0xE => true,
         0xF => true, /* reserved, default to execute */
-        _ => panic!(),
+        _ => unreachable!(),
     }
 }

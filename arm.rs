@@ -199,7 +199,7 @@ impl<T: Mmu> Cpu<T> {
                     0xD /* MOV */ => (valm, v, shift_carry),
                     0xE /* BIC */ => (valn & !valm, v, shift_carry),
                     0xF /* MVN */ => (!valm, v, shift_carry),
-                    _ => panic!(),
+                    _ => unreachable!(),
                 };
 
                 if s == 1 {
@@ -423,7 +423,7 @@ impl<T: Mmu> Cpu<T> {
                     self.mmu.set16(addr, val as u16);
                 } else {
                     self.reg[rd] = match (s, h) {
-                        (0, 0) /* SWP */ => panic!(),
+                        (0, 0) /* SWP */ => unreachable!(),
                         (0, 1) /* halfword load */  => self.mmu.load16(addr) as u32,
                         (1, 0) /* signed byte */    => {
                             self.mmu.load8(addr) as i8 as i32 as u32
@@ -431,7 +431,7 @@ impl<T: Mmu> Cpu<T> {
                         (1, 1) /* signed half */    => {
                             self.mmu.load16(addr) as i16 as i32 as u32
                         },
-                        _ => panic!()
+                        _ => unreachable!()
                     };
                 };
 
@@ -513,12 +513,12 @@ impl<T: Mmu> Cpu<T> {
                 let val = match b {
                     0 => self.mmu.load32(addr),
                     1 => self.mmu.load8(addr) as u32,
-                    _ => panic!(),
+                    _ => unreachable!(),
                 };
                 match b {
                     0 => self.mmu.set32(addr, self.reg[rm]),
                     1 => self.mmu.set8(addr, self.reg[rm] as u8),
-                    _ => panic!(),
+                    _ => unreachable!(),
                 };
 
                 self.reg[rd] = val;

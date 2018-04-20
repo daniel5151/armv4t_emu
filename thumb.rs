@@ -153,7 +153,7 @@ impl<T: Mmu> Cpu<T> {
                 let (res, new_v, new_c) = match op {
                     0 => add_flags(self.reg[rs], val2, 0),
                     1 => sub_flags(self.reg[rs], val2, 0),
-                    _ => panic!(),
+                    _ => unreachable!(),
                 };
 
                 self.reg[rd] = res;
@@ -169,7 +169,7 @@ impl<T: Mmu> Cpu<T> {
                     1 /* CMP */ |
                     3 /* SUB */ => sub_flags(self.reg[rd], imm, 0),
                     2 /* ADD */ => add_flags(self.reg[rd], imm, 0),
-                    _ => panic!(),
+                    _ => unreachable!(),
                 };
 
                 if op != 1 {
@@ -212,7 +212,7 @@ impl<T: Mmu> Cpu<T> {
                     0xD /* MUL */ => (vald.wrapping_mul(vals), v, 0),
                     0xE /* BIC */ => (vald & !vals, v, c),
                     0xF /* MVN */ => (!vals, v, c),
-                    _ => panic!(),
+                    _ => unreachable!(),
                 };
 
                 match op {
@@ -250,7 +250,7 @@ impl<T: Mmu> Cpu<T> {
                         let cpsr_mask = 1 << cpsr::T;
                         self.reg[reg::CPSR] = (cpsr & !cpsr_mask) | (new_t << cpsr::T);
                     },
-                    _ => panic!(),
+                    _ => unreachable!(),
                 };
             }
             PcLoad => {
@@ -276,7 +276,7 @@ impl<T: Mmu> Cpu<T> {
                     (0, 1) => self.mmu.set8(addr, self.reg[rd] as u8),
                     (1, 0) => self.reg[rd] = self.mmu.load32(addr & !3),
                     (1, 1) => self.reg[rd] = self.mmu.load8(addr) as u32,
-                    _ => panic!(),
+                    _ => unreachable!(),
                 };
             }
             HwSgnXfer => {
@@ -295,7 +295,7 @@ impl<T: Mmu> Cpu<T> {
                     (0, 1) => self.reg[rd] = self.mmu.load16(addr & !1) as u32,
                     (1, 0) => self.reg[rd] = self.mmu.load8(addr) as i8 as i32 as u32,
                     (1, 1) => self.reg[rd] = self.mmu.load16(addr & !1) as i16 as i32 as u32,
-                    _ => panic!(),
+                    _ => unreachable!(),
                 }
             }
             SingleXferI => {
