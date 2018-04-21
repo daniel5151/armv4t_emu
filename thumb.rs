@@ -293,8 +293,8 @@ impl<T: Mmu> Cpu<T> {
                 match (h, s) {
                     (0, 0) => self.mmu.set16(addr & !1, self.reg[rd] as u16),
                     (0, 1) => self.reg[rd] = self.mmu.load16(addr & !1) as u32,
-                    (1, 0) => self.reg[rd] = self.mmu.load8(addr) as i8 as i32 as u32,
-                    (1, 1) => self.reg[rd] = self.mmu.load16(addr & !1) as i16 as i32 as u32,
+                    (1, 0) => self.reg[rd] = self.mmu.load8(addr) as i8 as u32,
+                    (1, 1) => self.reg[rd] = self.mmu.load16(addr & !1) as i16 as u32,
                     _ => unreachable!(),
                 }
             }
@@ -446,7 +446,7 @@ impl<T: Mmu> Cpu<T> {
             }
             CondBranch => {
                 let cond = extract(inst, 8, 4);
-                let offset = extract(inst, 0, 8) as i8 as i32 as u32;
+                let offset = extract(inst, 0, 8) as i8 as u32;
 
                 if cond_met(cond, cpsr) {
                     self.reg[reg::PC] = pc.wrapping_add(4).wrapping_add(offset << 1);

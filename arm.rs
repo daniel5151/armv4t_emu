@@ -426,10 +426,10 @@ impl<T: Mmu> Cpu<T> {
                         (0, 0) /* SWP */ => unreachable!(),
                         (0, 1) /* halfword load */  => self.mmu.load16(addr) as u32,
                         (1, 0) /* signed byte */    => {
-                            self.mmu.load8(addr) as i8 as i32 as u32
+                            self.mmu.load8(addr) as i8 as u32
                         },
                         (1, 1) /* signed half */    => {
-                            self.mmu.load16(addr) as i16 as i32 as u32
+                            self.mmu.load16(addr) as i16 as u32
                         },
                         _ => unreachable!()
                     };
