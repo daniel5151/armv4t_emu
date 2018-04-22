@@ -210,6 +210,7 @@ impl<T: Mmu> Cpu<T> {
                         self.reg[reg::CPSR] = set(self.reg[reg::CPSR], 28, 4, new_flags);
                     } else {
                         self.reg[reg::CPSR] = self.reg[reg::SPSR];
+                        self.reg.update_bank();
                     }
                 }
 
@@ -249,6 +250,9 @@ impl<T: Mmu> Cpu<T> {
 
                     let cur = self.reg[rs];
                     self.reg[rs] = (cur & !mask) | val & mask;
+                    if rs == reg::CPSR {
+                        self.reg.update_bank();
+                    }
                 };
             }
             Multiply => {

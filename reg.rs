@@ -43,6 +43,7 @@ const REG_MAP: [[usize; 18]; 6] = [
 
 pub struct RegFile {
     reg: [u32; NUM_RGSR as usize],
+    bank: usize,
 }
 
 impl RegFile {
@@ -52,8 +53,8 @@ impl RegFile {
     }
 
     #[inline]
-    pub fn bank(&self) -> usize {
-        match self.mode() {
+    pub fn update_bank(&mut self) {
+        self.bank = match self.mode() {
             0x10 => 0, // user
             0x11 => 1, // FIQ
             0x12 => 2, // IRQ
@@ -71,6 +72,9 @@ impl RegFile {
     #[inline]
     pub fn set(&mut self, bank: usize, reg: Reg, val: u32) {
         self.reg[REG_MAP[bank][reg as usize]] = val;
+        if reg == CPSR {
+            self.update_bank()
+        }
     }
 
     #[inline]
@@ -81,7 +85,7 @@ impl RegFile {
 
 impl Default for RegFile {
     fn default() -> RegFile {
-        RegFile { reg: [0; NUM_RGSR as usize] }
+        RegFile { reg: [0; NUM_RGSR as usize], bank: 0 }
     }
 }
 
@@ -89,14 +93,14 @@ impl Index<Reg> for RegFile {
     type Output = u32;
     #[inline]
     fn index(&self, idx: Reg) -> &u32 {
-        &self.reg[REG_MAP[self.bank()][idx as usize]]
+        &self.reg[REG_MAP[self.bank][idx as usize]]
     }
 }
 
 impl IndexMut<Reg> for RegFile {
     #[inline]
     fn index_mut(&mut self, idx: Reg) -> &mut u32 {
-        &mut self.reg[REG_MAP[self.bank()][idx as usize]]
+        &mut self.reg[REG_MAP[self.bank][idx as usize]]
     }
 }
 
