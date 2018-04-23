@@ -101,6 +101,12 @@ impl<T: Mmu> Cpu<T> {
         let c = bit(cpsr, cpsr::C);
         let v = bit(cpsr, cpsr::V);
 
+        if pc == 0x800029c {
+            error!("hit");
+            use log;
+            log::set_max_level(log::LevelFilter::Debug);
+        }
+
         debug!(
             "THM: pc: {:#010x}, inst: {:#06x}",
             pc,
