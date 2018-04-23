@@ -629,4 +629,5 @@ mod test {
         ]
     );
     emutest!(emutest_arm7, [(0x1fc, 1), (0x200, 1), (0x204, 0x200)]);
+    emutest!(emutest_arm8, [(0x200, 10), (0x204, 83)]);
 }

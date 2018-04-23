@@ -568,4 +568,5 @@ mod test {
     );
     emutest!(emutest_thm3, [(0x1f8, 8), (0x1fc, 0x200), (0x200, 64)]);
     emutest!(emutest_thm4, [(0x200, 4), (0x204, 5)]);
+    emutest!(emutest_thm5, [(0x200, 10), (0x204, 83)]);
 }

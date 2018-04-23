@@ -47,22 +47,22 @@ pub fn cond_met(cond: u32, cpsr: u32) -> bool {
     let n = bit(cpsr, cpsr::N);
 
     match cond {
-        0x0 => z == 1,
-        0x1 => z == 0,
-        0x2 => c == 1,
-        0x3 => c == 0,
-        0x4 => n == 1,
-        0x5 => n == 0,
-        0x6 => v == 1,
-        0x7 => v == 0,
-        0x8 => c == 1 && z == 0,
-        0x9 => c == 0 || z == 1,
-        0xA => n == v,
-        0xB => n != v,
-        0xC => z == 0 && n == v,
-        0xD => z == 1 || n != v,
-        0xE => true,
-        0xF => true, /* reserved, default to execute */
+        0x0 /* EQ */ => z == 1,
+        0x1 /* NE */ => z == 0,
+        0x2 /* CS */ => c == 1,
+        0x3 /* CC */ => c == 0,
+        0x4 /* MI */ => n == 1,
+        0x5 /* PL */ => n == 0,
+        0x6 /* VS */ => v == 1,
+        0x7 /* VC */ => v == 0,
+        0x8 /* HI */ => c == 1 && z == 0,
+        0x9 /* LS */ => c == 0 || z == 1,
+        0xA /* GE */ => n == v,
+        0xB /* LT */ => n != v,
+        0xC /* GT */ => z == 0 && n == v,
+        0xD /* LE */ => z == 1 || n != v,
+        0xE /* AL */ => true,
+        0xF /*    */ => true, /* reserved, default to execute */
         _ => unreachable!(),
     }
 }
