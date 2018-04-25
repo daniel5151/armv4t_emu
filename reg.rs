@@ -85,7 +85,10 @@ impl RegFile {
 
 impl Default for RegFile {
     fn default() -> RegFile {
-        RegFile { reg: [0; NUM_RGSR as usize], bank: 0 }
+        RegFile {
+            reg: [0; NUM_RGSR as usize],
+            bank: 0,
+        }
     }
 }
 
