@@ -290,7 +290,7 @@ impl<T: Mmu> Cpu<T> {
                 let offset = self.reg[ro];
                 let addr = self.reg[rb].wrapping_add(offset);
 
-                match (h, s) {
+                match (s, h) {
                     (0, 0) => self.mmu.set16(addr & !1, self.reg[rd] as u16),
                     (0, 1) => self.reg[rd] = self.mmu.load16(addr & !1) as u32,
                     (1, 0) => self.reg[rd] = self.mmu.load8(addr) as i8 as u32,
