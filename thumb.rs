@@ -45,8 +45,8 @@ const INST_MATCH_ORDER: [Instruction; 20] = [
     Instruction::SpAdd,
     Instruction::PushPop,
     Instruction::BlockXfer,
-    Instruction::CondBranch,
     Instruction::SoftwareInt,
+    Instruction::CondBranch,
     Instruction::LongBranch,
     Instruction::Undefined,
 ];
