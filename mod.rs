@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::default::Default;
 use std::iter::IntoIterator;
 
@@ -15,6 +16,7 @@ use self::reg::*;
 pub struct Cpu<T: Mmu> {
     reg: RegFile,
     mmu: Shared<T>,
+    brk: HashSet<u32>,
 }
 
 impl<T: Mmu> Cpu<T> {
@@ -25,6 +27,7 @@ impl<T: Mmu> Cpu<T> {
         let mut cpu = Cpu {
             reg: Default::default(),
             mmu: mmu,
+            brk: Default::default(),
         };
         cpu.init(regs);
 
@@ -42,6 +45,15 @@ impl<T: Mmu> Cpu<T> {
         }
     }
 
+    pub fn set_breaks<'a, I>(&mut self, brks: I)
+    where
+        I: IntoIterator<Item = &'a u32>
+    {
+        for addr in brks.into_iter() {
+            self.brk.insert(*addr);
+        }
+    }
+
     pub fn run(&mut self) {
         let mut run = true;
         while run {
@@ -50,6 +62,9 @@ impl<T: Mmu> Cpu<T> {
     }
 
     pub fn cycle(&mut self) -> bool {
+        if self.brk.contains(&self.reg[reg::PC]) {
+            debug!("Breakpoint {:#010x} hit!", self.reg[reg::PC]);
+        }
         if !self.thumb_mode() {
             self.execute_arm()
         } else {
