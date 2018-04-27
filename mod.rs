@@ -6,12 +6,15 @@ use shared::Shared;
 
 use mmu::Mmu;
 
+pub mod mode;
+pub mod exception;
+pub mod reg;
 mod arm;
 mod thumb;
 mod util;
-pub mod reg;
 
 use self::reg::*;
+use self::exception::Exception;
 
 pub struct Cpu<T: Mmu> {
     reg: RegFile,
@@ -22,7 +25,7 @@ pub struct Cpu<T: Mmu> {
 impl<T: Mmu> Cpu<T> {
     pub fn new<'a, I>(mmu: Shared<T>, regs: I) -> Cpu<T>
     where
-        I: IntoIterator<Item = &'a (Reg, u32)>,
+        I: IntoIterator<Item = &'a (usize, Reg, u32)>,
     {
         let mut cpu = Cpu {
             reg: Default::default(),
@@ -36,12 +39,12 @@ impl<T: Mmu> Cpu<T> {
 
     fn init<'a, I>(&mut self, regs: I)
     where
-        I: IntoIterator<Item = &'a (Reg, u32)>,
+        I: IntoIterator<Item = &'a (usize, Reg, u32)>,
     {
         // start in system mode
         self.reg.set(0, reg::CPSR, 0x1F);
-        for &(reg, val) in regs.into_iter() {
-            self.reg[reg] = val;
+        for &(bank, reg, val) in regs.into_iter() {
+            self.reg.set(bank, reg, val);
         }
     }
 
@@ -70,6 +73,34 @@ impl<T: Mmu> Cpu<T> {
         } else {
             self.execute_thumb()
         }
+    }
+
+    pub fn exception(&mut self, exc: &Exception) {
+        // this should already be pointing at the next instruction
+        let new_mode = exc.mode_on_entry();
+        let new_bank = new_mode.reg_bank();
+
+        let cpsr = self.reg.get(0, reg::CPSR);
+        // instruction that just executed + (2/4 depending on
+        // thumb vs arm)
+        let pc = self.reg.get(0, reg::PC);
+
+        let new_lr = match *exc {
+            Exception::Interrupt => pc + 4,
+            _ => pc,
+        };
+
+        self.reg.set(new_bank, reg::LR, new_lr);
+        self.reg.set(new_bank, reg::SPSR, cpsr);
+
+        self.reg.set(0, reg::PC, exc.address());
+        let new_cpsr =
+            (new_mode.bits() as u32) |
+            (0 << 5) /* ARM mode */ |
+            ((exc.fiq_disable() as u32) << 6) |
+            (1 << 7) /* IRQ disable */ |
+            (cpsr & (0xf << 28)) /* condition flags */;
+        self.reg.set(0, reg::CPSR, new_cpsr);
     }
 
     pub fn set_thumb_mode(&mut self, thumb: bool) {

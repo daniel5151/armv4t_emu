@@ -3,6 +3,7 @@ use bit_util::*;
 use super::*;
 use super::reg::*;
 use super::util::*;
+use super::mode::Mode;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum Instruction {
@@ -235,7 +236,7 @@ impl<T: Mmu> Cpu<T> {
                     let c = bit(inst, 16);
 
                     // user mode can't change the control bits
-                    let ctrl = ((self.reg.mode() != 0x10) as u32) * c;
+                    let ctrl = ((self.reg.mode() != Mode::User) as u32) * c;
 
                     let mask = 0xf0000000 * f + 0x000000ff * ctrl;
 
@@ -528,10 +529,7 @@ impl<T: Mmu> Cpu<T> {
                 self.reg[rd] = val;
             }
             SoftwareInt => {
-                // FIXME: This is supposed to switch to supervisor mode
-                // I'm not convinced I can't just do this in software though
-                // Need to come back to this
-                unimplemented!()
+                self.exception(&Exception::Software);
             }
             Undefined => return false,
         };
@@ -586,7 +584,7 @@ mod test {
                                                   stringify!($name),
                                                   ".bin"));
                 let mut mmu = Ram::new_with_data(0x1000, prog);
-                let mut cpu = super::Cpu::new(Shared::new(&mut mmu), &[(reg::PC, 0x0u32)]);
+                let mut cpu = super::Cpu::new(Shared::new(&mut mmu), &[(0, reg::PC, 0x0u32)]);
                 cpu.run();
 
                 let mem = &cpu.mmu;

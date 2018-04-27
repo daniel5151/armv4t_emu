@@ -3,6 +3,8 @@ use std::ops::{Index, IndexMut};
 
 use bit_util::extract;
 
+use super::mode::Mode;
+
 pub type Reg = u8;
 
 const NUM_RGSR: Reg = 37;
@@ -15,26 +17,7 @@ pub const SPSR: Reg = 17;
 
 const REG_MAP: [[usize; 18]; 6] = [
     [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 16],
-    [
-        0,
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        17,
-        18,
-        19,
-        20,
-        21,
-        22,
-        23,
-        15,
-        16,
-        24,
-    ],
+    [0, 1, 2, 3, 4, 5, 6, 7, 17, 18, 19, 20, 21, 22, 23, 15, 16, 24],
     [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 25, 26, 15, 16, 27],
     [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 28, 29, 15, 16, 30],
     [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 31, 32, 15, 16, 33],
@@ -48,25 +31,13 @@ pub struct RegFile {
 
 impl RegFile {
     #[inline]
-    pub fn mode(&self) -> u32 {
-        extract(self.reg[CPSR as usize], 0, 5)
+    pub fn mode(&self) -> Mode {
+        Mode::from_bits(extract(self.reg[CPSR as usize], 0, 5) as u8)
     }
 
     #[inline]
     pub fn update_bank(&mut self) {
-        self.bank = match self.mode() {
-            0x10 => 0, // user
-            0x11 => 1, // FIQ
-            0x12 => 2, // IRQ
-            0x13 => 3, // Supervisor
-            0x17 => 4, // Abort
-            0x1B => 5, // Undefined
-            0x1F => 0, // privileged user
-            val => {
-                warn!("Invalid mode: {:#010x}", val);
-                0
-            }
-        }
+        self.bank = self.mode().reg_bank();
     }
 
     #[inline]

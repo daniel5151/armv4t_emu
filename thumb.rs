@@ -453,10 +453,7 @@ impl<T: Mmu> Cpu<T> {
                 }
             }
             SoftwareInt => {
-                // FIXME: This is supposed to switch to supervisor mode
-                // I'm not convinced I can't just do this in software though
-                // Need to come back to this
-                unimplemented!()
+                self.exception(&Exception::Software);
             }
             Branch => {
                 let offset = sign_extend(extract(inst, 0, 11) << 1, 12);
@@ -532,8 +529,8 @@ mod test {
                 let mut mmu = Ram::new_with_data(0x1000, prog);
                 let mut cpu = super::Cpu::new(Shared::new(&mut mmu),
                     // Start at 0, with a stack pointer, and in thumb mode
-                    &[(reg::PC, 0x0u32),
-                      (reg::SP, 0x200)]);
+                    &[(0, reg::PC, 0x0u32),
+                      (0, reg::SP, 0x200)]);
                 cpu.set_thumb_mode(true);
                 cpu.run();
 
