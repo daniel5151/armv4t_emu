@@ -50,7 +50,7 @@ impl<T: Mmu> Cpu<T> {
 
     pub fn set_breaks<'a, I>(&mut self, brks: I)
     where
-        I: IntoIterator<Item = &'a u32>
+        I: IntoIterator<Item = &'a u32>,
     {
         for addr in brks.into_iter() {
             self.brk.insert(*addr);
