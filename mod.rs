@@ -109,6 +109,10 @@ impl<T: Mmu> Cpu<T> {
         self.reg[reg::CPSR] = (cpsr & !mask) | ((thumb as u32) * mask);
     }
 
+    pub fn irq_enable(&self) -> bool {
+        self.reg.get(0, reg::CPSR) & (1 << 7) == 0
+    }
+
     fn thumb_mode(&self) -> bool {
         (self.reg[reg::CPSR] & (1u32 << cpsr::T)) != 0
     }
