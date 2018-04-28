@@ -66,7 +66,7 @@ impl<T: Mmu> Cpu<T> {
 
     pub fn cycle(&mut self) -> bool {
         if self.brk.contains(&self.reg[reg::PC]) {
-            debug!("Breakpoint {:#010x} hit!", self.reg[reg::PC]);
+            warn!("Breakpoint {:#010x} hit!", self.reg[reg::PC]);
         }
         if !self.thumb_mode() {
             self.execute_arm()
