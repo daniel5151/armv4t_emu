@@ -584,7 +584,8 @@ mod test {
                                                   stringify!($name),
                                                   ".bin"));
                 let mut mmu = Ram::new_with_data(0x1000, prog);
-                let mut cpu = super::Cpu::new(Shared::new(&mut mmu), &[(0, reg::PC, 0x0u32)]);
+                let mut cpu = super::Cpu::new(Shared::new(&mut mmu),
+                    &[(0, reg::PC, 0x0u32), (0, reg::CPSR, 0x10)]);
                 cpu.run();
 
                 let mem = &cpu.mmu;

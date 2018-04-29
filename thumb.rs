@@ -530,7 +530,8 @@ mod test {
                 let mut cpu = super::Cpu::new(Shared::new(&mut mmu),
                     // Start at 0, with a stack pointer, and in thumb mode
                     &[(0, reg::PC, 0x0u32),
-                      (0, reg::SP, 0x200)]);
+                      (0, reg::SP, 0x200),
+                      (0, reg::CPSR, 0x10)]);
                 cpu.set_thumb_mode(true);
                 cpu.run();
 

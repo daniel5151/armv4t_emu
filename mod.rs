@@ -37,6 +37,12 @@ impl<T: Mmu> Cpu<T> {
         cpu
     }
 
+    /// Initializes registers according to the ARM documentation
+    pub fn init_arm(&mut self) {
+        // http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.faqs/ka3761.html
+        self.init(&[(0, reg::PC, 0), (0, reg::CPSR, 0xd3)]);
+    }
+
     fn init<'a, I>(&mut self, regs: I)
     where
         I: IntoIterator<Item = &'a (usize, Reg, u32)>,
