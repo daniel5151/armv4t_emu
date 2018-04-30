@@ -96,7 +96,7 @@ impl<T: Mmu> Cpu<T> {
     /// executing.
     pub fn execute_thumb(&mut self) -> bool {
         let pc = self.reg[reg::PC];
-        let inst = self.mmu.load16(pc & !1) as u32;
+        let inst = self.mmu.load16(pc) as u32;
         let cpsr = self.reg[reg::CPSR];
         let c = bit(cpsr, cpsr::C);
         let v = bit(cpsr, cpsr::V);
@@ -356,7 +356,7 @@ impl<T: Mmu> Cpu<T> {
                 let imm = extract(inst, 0, 8);
 
                 let base = if s == 0 {
-                    self.reg[reg::PC].wrapping_add(2) & !1
+                    self.reg[reg::PC].wrapping_add(2) & !2
                 } else {
                     self.reg[reg::SP]
                 };
@@ -405,7 +405,8 @@ impl<T: Mmu> Cpu<T> {
                     if l == 0 {
                         self.mmu.set32(idx_addr, self.reg[reg]);
                     } else {
-                        self.reg[reg] = self.mmu.load32(idx_addr);
+                        self.reg[reg] = self.mmu.load32(idx_addr) &
+                            if reg == reg::PC { !1 } else { !0 };
                     }
 
                     rem -= 1 << reg;

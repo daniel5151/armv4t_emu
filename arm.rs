@@ -448,7 +448,7 @@ impl<T: Mmu> Cpu<T> {
             BlockXfer => {
                 let p = bit(inst, 24);
                 let u = bit(inst, 23);
-                let _s = bit(inst, 22);
+                let s = bit(inst, 22);
                 let w = bit(inst, 21);
                 let l = bit(inst, 20);
 
@@ -470,10 +470,6 @@ impl<T: Mmu> Cpu<T> {
                     base.wrapping_add(total * 4)
                 };
 
-                if w == 1 {
-                    self.reg[rn] = post_addr;
-                }
-
                 let addr = if u == 0 { post_addr } else { base };
 
                 // If we are going up, and pre-incrementing,
@@ -482,27 +478,54 @@ impl<T: Mmu> Cpu<T> {
                 let pre_incr = (p == u) as u32;
 
                 let mut rem = reglist;
-                for i in 0..16 {
-                    if rem == 0 {
-                        break;
+                if s == 0 || (rem & (1 << reg::PC)) == 1 {
+                    if w == 1 {
+                        self.reg[rn] = post_addr;
                     }
-                    let r = rem.trailing_zeros() as Reg;
-                    let idx_addr = addr.wrapping_add((i + pre_incr) * 4);
-                    if l == 0 {
-                        // store
-                        let val = if r == reg::PC {
-                            pc.wrapping_add(12)
-                        } else if r == rn && w == 1 && i == 0 {
-                            orig_base
+
+                    for i in 0..16 {
+                        if rem == 0 {
+                            break;
+                        }
+                        let r = rem.trailing_zeros() as Reg;
+                        let idx_addr = addr.wrapping_add((i + pre_incr) * 4);
+                        if l == 0 {
+                            // store
+                            let val = if r == reg::PC {
+                                pc.wrapping_add(12)
+                            } else if r == rn && w == 1 && i == 0 {
+                                orig_base
+                            } else {
+                                self.reg[r]
+                            };
+                            self.mmu.set32(idx_addr, val);
                         } else {
-                            self.reg[r]
+                            // load
+                            self.reg[r] = self.mmu.load32(idx_addr);
+                            if r == reg::PC && s == 1 {
+                                self.reg[reg::CPSR] = self.reg[reg::SPSR];
+                            }
                         };
-                        self.mmu.set32(idx_addr, val);
-                    } else {
-                        // load
-                        self.reg[r] = self.mmu.load32(idx_addr);
-                    };
-                    rem -= 1u32 << r;
+                        rem -= 1u32 << r;
+                    }
+                } else {
+                    for i in 0..16 {
+                        if rem == 0 {
+                            break;
+                        }
+                        let r = rem.trailing_zeros() as Reg;
+                        let idx_addr = addr.wrapping_add((i + pre_incr) * 4);
+                        if l == 0 {
+                            // store
+                            let val = self.reg.get(0, r);
+                            self.mmu.set32(idx_addr, val);
+                        } else {
+                            // load
+                            self.reg.set(0, r, self.mmu.load32(idx_addr));
+                            self.reg[r] = self.mmu.load32(idx_addr);
+                        };
+                        rem -= 1u32 << r;
+                    }
                 }
             }
             Swap => {
