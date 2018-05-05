@@ -252,6 +252,9 @@ impl<T: Mmu> Cpu<T> {
                     },
                     _ => unreachable!(),
                 };
+                if crd == reg::PC {
+                    self.reg[reg::PC] &= !1;
+                }
             }
             PcLoad => {
                 let rd = extract(inst, 8, 3) as Reg;
