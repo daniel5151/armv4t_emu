@@ -43,6 +43,18 @@ impl<T: Mmu> Cpu<T> {
         self.init(&[(0, reg::PC, 0), (0, reg::CPSR, 0xd3)]);
     }
 
+    /// Initializes the registers to emulate booting through BIOS, to directly
+    /// start a ROM
+    pub fn init_direct(&mut self) {
+        self.init(&[
+            (0, reg::PC, 0x8000000),
+            (0, reg::CPSR, 0x1f),
+            (0, reg::SP, 0x3007f00),
+            (2, reg::SP, 0x3007fa0),
+            (3, reg::SP, 0x3007fe0),
+        ]);
+    }
+
     fn init<'a, I>(&mut self, regs: I)
     where
         I: IntoIterator<Item = &'a (usize, Reg, u32)>,
