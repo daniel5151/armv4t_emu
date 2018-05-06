@@ -204,7 +204,7 @@ impl<T: Mmu> Cpu<T> {
                         (res, v, new_c)
                     },
                     0x5 /* ADC */ => add_flags(vald, vals, c),
-                    0x6 /* SBC */ => add_flags(vald, vals, 1-c),
+                    0x6 /* SBC */ => sub_flags(vald, vals, 1-c),
                     0x9 /* NEG */ => sub_flags(0, vals, 0),
                     0xA /* CMP */ => sub_flags(vald, vals, 0),
                     0xB /* CMN */ => add_flags(vald, vals, 0),
@@ -565,4 +565,5 @@ mod test {
     emutest!(emutest_thm3, [(0x1f8, 8), (0x1fc, 0x200), (0x200, 64)]);
     emutest!(emutest_thm4, [(0x200, 4), (0x204, 5)]);
     emutest!(emutest_thm5, [(0x200, 10), (0x204, 83)]);
+    emutest!(emutest_thm6, [(0x1fc, 0)]);
 }
