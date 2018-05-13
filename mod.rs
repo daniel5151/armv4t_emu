@@ -77,13 +77,6 @@ impl<T: Mmu> Cpu<T> {
         }
     }
 
-    pub fn run(&mut self) {
-        let mut run = true;
-        while run {
-            run = self.cycle();
-        }
-    }
-
     pub fn cycle(&mut self) -> bool {
         if self.brk.contains(&self.reg[reg::PC]) {
             warn!("Breakpoint {:#010x} hit!", self.reg[reg::PC]);
@@ -123,17 +116,31 @@ impl<T: Mmu> Cpu<T> {
         self.reg.set(0, reg::CPSR, new_cpsr);
     }
 
-    pub fn set_thumb_mode(&mut self, thumb: bool) {
-        let mask = 1u32 << cpsr::T;
-        let cpsr = self.reg[reg::CPSR];
-        self.reg[reg::CPSR] = (cpsr & !mask) | ((thumb as u32) * mask);
-    }
-
     pub fn irq_enable(&self) -> bool {
         self.reg.get(0, reg::CPSR) & (1 << 7) == 0
     }
 
     fn thumb_mode(&self) -> bool {
         (self.reg[reg::CPSR] & (1u32 << cpsr::T)) != 0
+    }
+}
+
+#[cfg(test)]
+pub mod test {
+    use super::*;
+
+    impl<T: Mmu> Cpu<T> {
+        pub fn run(&mut self) {
+            let mut run = true;
+            while run {
+                run = self.cycle();
+            }
+        }
+
+        pub fn set_thumb_mode(&mut self, thumb: bool) {
+            let mask = 1u32 << cpsr::T;
+            let cpsr = self.reg[reg::CPSR];
+            self.reg[reg::CPSR] = (cpsr & !mask) | ((thumb as u32) * mask);
+        }
     }
 }
