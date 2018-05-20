@@ -372,17 +372,13 @@ impl<T: Mmu> Cpu<T> {
                     let val = self.reg[rd].wrapping_add(((rd == reg::PC) as u32) * 8);
                     if b == 0 {
                         // force alignment of the store
-                        self.mmu.set32(addr & !3, val);
+                        self.set32(addr, val);
                     } else {
                         self.mmu.set8(addr, val as u8);
                     };
                 } else {
                     self.reg[rd] = if b == 0 {
-                        let val = self.mmu.load32(addr & !3);
-                        // we need to rotate it so the addressed offset is
-                        // at the base
-                        let offset = addr & 3;
-                        val.rotate_right(offset * 8)
+                        self.load32(addr)
                     } else {
                         self.mmu.load8(addr) as u32
                     };
@@ -462,7 +458,7 @@ impl<T: Mmu> Cpu<T> {
                 let total = reglist.count_ones();
 
                 let orig_base = self.reg[rn];
-                let base = orig_base & !3;
+                let base = orig_base;
 
                 let post_addr = if u == 0 {
                     base.wrapping_sub(total * 4)
@@ -498,10 +494,10 @@ impl<T: Mmu> Cpu<T> {
                             } else {
                                 self.reg[r]
                             };
-                            self.mmu.set32(idx_addr, val);
+                            self.set32(idx_addr, val);
                         } else {
                             // load
-                            self.reg[r] = self.mmu.load32(idx_addr);
+                            self.reg[r] = self.load32(idx_addr);
                             if r == reg::PC && s == 1 {
                                 self.reg[reg::CPSR] = self.reg[reg::SPSR];
                             }
@@ -518,11 +514,11 @@ impl<T: Mmu> Cpu<T> {
                         if l == 0 {
                             // store
                             let val = self.reg.get(0, r);
-                            self.mmu.set32(idx_addr, val);
+                            self.set32(idx_addr, val);
                         } else {
                             // load
-                            self.reg.set(0, r, self.mmu.load32(idx_addr));
-                            self.reg[r] = self.mmu.load32(idx_addr);
+                            let val = self.load32(idx_addr);
+                            self.reg.set(0, r, val);
                         };
                         rem -= 1u32 << r;
                     }
@@ -539,13 +535,14 @@ impl<T: Mmu> Cpu<T> {
                 let addr = self.reg[rn] & !((1 - b) * 3);
 
                 let val = match b {
-                    0 => self.mmu.load32(addr),
+                    0 => self.load32(addr),
                     1 => self.mmu.load8(addr) as u32,
                     _ => unreachable!(),
                 };
+                let oval = self.reg[rm];
                 match b {
-                    0 => self.mmu.set32(addr, self.reg[rm]),
-                    1 => self.mmu.set8(addr, self.reg[rm] as u8),
+                    0 => self.set32(addr, oval),
+                    1 => self.mmu.set8(addr, oval as u8),
                     _ => unreachable!(),
                 };
 

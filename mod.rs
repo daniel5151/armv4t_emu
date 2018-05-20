@@ -12,6 +12,7 @@ pub mod reg;
 mod arm;
 mod thumb;
 mod util;
+mod mem;
 
 use self::reg::*;
 use self::exception::Exception;

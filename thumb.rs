@@ -260,9 +260,9 @@ impl<T: Mmu> Cpu<T> {
                 let rd = extract(inst, 8, 3) as Reg;
                 let offset = extract(inst, 0, 8);
 
-                let addr = self.reg[reg::PC].wrapping_add(2).wrapping_add(offset * 4) & !3;
+                let addr = self.reg[reg::PC].wrapping_add(2).wrapping_add(offset * 4);
 
-                self.reg[rd] = self.mmu.load32(addr);
+                self.reg[rd] = self.load32(addr);
             }
             SingleXferR => {
                 let l = bit(inst, 11);
@@ -275,9 +275,9 @@ impl<T: Mmu> Cpu<T> {
                 let offset = self.reg[ro];
                 let addr = self.reg[rb].wrapping_add(offset);
                 match (l, b) {
-                    (0, 0) => self.mmu.set32(addr & !3, self.reg[rd]),
-                    (0, 1) => self.mmu.set8(addr, self.reg[rd] as u8),
-                    (1, 0) => self.reg[rd] = self.mmu.load32(addr & !3),
+                    (0, 0) => { let v = self.reg[rd]; self.set32(addr, v) }
+                    (0, 1) => { let v = self.reg[rd]; self.mmu.set8(addr, v as u8) }
+                    (1, 0) => self.reg[rd] = self.load32(addr),
                     (1, 1) => self.reg[rd] = self.mmu.load8(addr) as u32,
                     _ => unreachable!(),
                 };
@@ -310,11 +310,12 @@ impl<T: Mmu> Cpu<T> {
                 let rd = extract(inst, 0, 3) as Reg;
 
                 if b == 0 {
-                    let addr = self.reg[rb].wrapping_add(offset * 4) & !3;
+                    let addr = self.reg[rb].wrapping_add(offset * 4);
                     if l == 0 {
-                        self.mmu.set32(addr, self.reg[rd]);
+                        let val = self.reg[rd];
+                        self.set32(addr, val);
                     } else {
-                        self.reg[rd] = self.mmu.load32(addr);
+                        self.reg[rd] = self.load32(addr);
                     }
                 } else {
                     let addr = self.reg[rb].wrapping_add(offset);
@@ -348,9 +349,10 @@ impl<T: Mmu> Cpu<T> {
                 let addr = self.reg[reg::SP].wrapping_add(offset);
 
                 if l == 0 {
-                    self.mmu.set32(addr, self.reg[rd]);
+                    let val = self.reg[rd];
+                    self.set32(addr, val);
                 } else {
-                    self.reg[rd] = self.mmu.load32(addr);
+                    self.reg[rd] = self.load32(addr);
                 }
             }
             LoadAddr => {
@@ -386,7 +388,7 @@ impl<T: Mmu> Cpu<T> {
 
                 let total = rlist.count_ones() + r;
 
-                let base = self.reg[reg::SP] & !3;
+                let base = self.reg[reg::SP];
                 let post_addr = if l == 0 {
                     base.wrapping_sub(total * 4)
                 } else {
@@ -406,9 +408,10 @@ impl<T: Mmu> Cpu<T> {
                     let reg = rem.trailing_zeros() as Reg;
                     let idx_addr = addr.wrapping_add(i * 4);
                     if l == 0 {
-                        self.mmu.set32(idx_addr, self.reg[reg]);
+                        let val = self.reg[reg];
+                        self.set32(idx_addr, val);
                     } else {
-                        self.reg[reg] = self.mmu.load32(idx_addr) &
+                        self.reg[reg] = self.load32(idx_addr) &
                             if reg == reg::PC { !1 } else { !0 };
                     }
 
@@ -440,9 +443,9 @@ impl<T: Mmu> Cpu<T> {
                         } else {
                             self.reg[reg]
                         };
-                        self.mmu.set32(idx_addr, val);
+                        self.set32(idx_addr, val);
                     } else {
-                        self.reg[reg] = self.mmu.load32(idx_addr);
+                        self.reg[reg] = self.load32(idx_addr);
                     }
 
                     rem -= 1 << reg;
@@ -566,4 +569,5 @@ mod test {
     emutest!(emutest_thm4, [(0x200, 4), (0x204, 5)]);
     emutest!(emutest_thm5, [(0x200, 10), (0x204, 83)]);
     emutest!(emutest_thm6, [(0x1fc, 0)]);
+    emutest!(emutest_thm7, [(0x1fc, 0xff)]);
 }
