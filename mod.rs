@@ -81,7 +81,10 @@ impl<T: Mmu> Cpu<T> {
     pub fn cycle(&mut self) -> bool {
         if self.brk.contains(&self.reg[reg::PC]) {
             warn!("Breakpoint {:#010x} hit!", self.reg[reg::PC]);
+            at_breakpoint();
         }
+
+        at_cycle();
         if !self.thumb_mode() {
             self.execute_arm()
         } else {
@@ -125,6 +128,10 @@ impl<T: Mmu> Cpu<T> {
         (self.reg[reg::CPSR] & (1u32 << cpsr::T)) != 0
     }
 }
+
+// These are functions to set breakpoints on for debugging
+fn at_breakpoint() {}
+fn at_cycle() {}
 
 #[cfg(test)]
 pub mod test {
