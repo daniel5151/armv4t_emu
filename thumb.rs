@@ -260,7 +260,7 @@ impl<T: Mmu> Cpu<T> {
                 let rd = extract(inst, 8, 3) as Reg;
                 let offset = extract(inst, 0, 8);
 
-                let addr = self.reg[reg::PC].wrapping_add(2).wrapping_add(offset * 4);
+                let addr = self.reg[reg::PC].wrapping_add(2).wrapping_add(offset * 4) & !3;
 
                 self.reg[rd] = self.load32(addr);
             }
@@ -570,4 +570,5 @@ mod test {
     emutest!(emutest_thm5, [(0x200, 10), (0x204, 83)]);
     emutest!(emutest_thm6, [(0x1fc, 0)]);
     emutest!(emutest_thm7, [(0x1fc, 0xff)]);
+    emutest!(emutest_thm8, [(0x1fc, 0x01234567)]);
 }
