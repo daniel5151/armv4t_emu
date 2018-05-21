@@ -1,13 +1,16 @@
 use std::default::Default;
 use std::ops::{Index, IndexMut};
 
+use serde::{Deserialize, Serialize, Serializer};
+use serde::ser::SerializeTuple;
+
 use bit_util::extract;
 
 use super::mode::Mode;
 
 pub type Reg = u8;
 
-const NUM_RGSR: Reg = 37;
+const NUM_RGSR: usize = 37;
 
 pub const SP: Reg = 13;
 pub const LR: Reg = 14;
@@ -26,7 +29,7 @@ const REG_MAP: [[usize; 18]; 6] = [
 ];
 
 pub struct RegFile {
-    reg: [u32; NUM_RGSR as usize],
+    reg: [u32; NUM_RGSR],
     bank: usize,
 }
 
@@ -58,7 +61,7 @@ impl RegFile {
 impl Default for RegFile {
     fn default() -> RegFile {
         RegFile {
-            reg: [0; NUM_RGSR as usize],
+            reg: [0; NUM_RGSR],
             bank: 0,
         }
     }
@@ -76,6 +79,16 @@ impl IndexMut<Reg> for RegFile {
     #[inline]
     fn index_mut(&mut self, idx: Reg) -> &mut u32 {
         &mut self.reg[REG_MAP[self.bank][idx as usize]]
+    }
+}
+
+impl Serialize for RegFile {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut seq = serializer.serialize_tuple(NUM_RGSR)?;
+        for r in self.reg.iter() {
+            seq.serialize_element(r)?;
+        }
+        seq.end()
     }
 }
 

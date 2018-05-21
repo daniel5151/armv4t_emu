@@ -2,6 +2,9 @@ use std::collections::HashSet;
 use std::default::Default;
 use std::iter::IntoIterator;
 
+use serde::{Serialize, Serializer};
+use serde::ser::SerializeStruct;
+
 use shared::Shared;
 
 use mmu::Mmu;
@@ -126,6 +129,14 @@ impl<T: Mmu> Cpu<T> {
 
     fn thumb_mode(&self) -> bool {
         (self.reg[reg::CPSR] & (1u32 << cpsr::T)) != 0
+    }
+}
+
+impl<T: Mmu> Serialize for Cpu<T> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut s = serializer.serialize_struct("gba_rs::cpu::Cpu", 1)?;
+        s.serialize_field("reg", &self.reg)?;
+        s.end()
     }
 }
 
