@@ -22,7 +22,7 @@ use self::exception::Exception;
 #[derive(Serialize, Deserialize)]
 pub struct Cpu<T: Mmu> {
     reg: RegFile,
-    #[serde(skip)]
+    #[serde(skip, default = "Default::default")]
     mmu: Shared<T>,
     #[serde(skip)]
     brk: HashSet<u32>,
