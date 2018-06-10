@@ -96,31 +96,32 @@ impl Serialize for RegFile {
     }
 }
 
-impl<'de, T: Mmu> Deserialize<'de> for Cpu<T> {
+impl<'de> Deserialize<'de> for RegFile {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        struct CpuVisitor<T: Mmu> {
-            phantom: PhantomData<T>,
-        };
-        impl<'de, T: Mmu> Visitor<'de> for CpuVisitor<T> {
-            type Value = Cpu<T>;
+        struct RegVisitor;
+        impl<'de> Visitor<'de> for RegVisitor {
+            type Value = RegFile;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("struct Gba")
+                formatter.write_str("tuple RegFile")
             }
 
-            fn visit_seq<V: SeqAccess<'de>>(self, mut seq: V) -> Result<Cpu<T>, V::Error> {
-                let reg = seq.next_element()?
-                    .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+            fn visit_seq<V: SeqAccess<'de>>(self, mut seq: V) -> Result<RegFile, V::Error> {
+                let mut reg = RegFile {
+                    reg: [0; NUM_RGSR],
+                    bank: 0,
+                };
+                for i in 0..NUM_RGSR {
+                    reg.reg[i] = seq.next_element()?
+                        .ok_or_else(|| de::Error::invalid_length(i, &self))?;
+                }
+                reg.update_bank();
 
-                Ok(Cpu {
-                    reg: reg,
-                    ..Default::default()
-                })
+                Ok(reg)
             }
         }
 
-        const FIELDS: &'static [&'static str] = &["reg"];
-        deserializer.deserialize_struct("gba_rs::cpu::Cpu", FIELDS, CpuVisitor { phantom: PhantomData })
+        deserializer.deserialize_tuple(NUM_RGSR, RegVisitor)
     }
 }
 

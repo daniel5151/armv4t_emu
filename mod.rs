@@ -4,11 +4,6 @@ use std::fmt;
 use std::iter::IntoIterator;
 use std::marker::PhantomData;
 
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
-use serde::ser::SerializeStruct;
-use serde::de;
-use serde::de::{Visitor, SeqAccess};
-
 use shared::Shared;
 
 use mmu::Mmu;
@@ -24,9 +19,12 @@ mod mem;
 use self::reg::*;
 use self::exception::Exception;
 
+#[derive(Serialize, Deserialize)]
 pub struct Cpu<T: Mmu> {
     reg: RegFile,
+    #[serde(skip)]
     mmu: Shared<T>,
+    #[serde(skip)]
     brk: HashSet<u32>,
 }
 
@@ -133,42 +131,6 @@ impl<T: Mmu> Cpu<T> {
 
     fn thumb_mode(&self) -> bool {
         (self.reg[reg::CPSR] & (1u32 << cpsr::T)) != 0
-    }
-}
-
-impl<T: Mmu> Serialize for Cpu<T> {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut s = serializer.serialize_struct("gba_rs::cpu::Cpu", 1)?;
-        s.serialize_field("reg", &self.reg)?;
-        s.end()
-    }
-}
-
-impl<'de, T: Mmu> Deserialize<'de> for Cpu<T> {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        struct CpuVisitor<T: Mmu> {
-            phantom: PhantomData<T>,
-        };
-        impl<'de, T: Mmu> Visitor<'de> for CpuVisitor<T> {
-            type Value = Cpu<T>;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("struct Gba")
-            }
-
-            fn visit_seq<V: SeqAccess<'de>>(self, mut seq: V) -> Result<Cpu<T>, V::Error> {
-                let reg = seq.next_element()?
-                    .ok_or_else(|| de::Error::invalid_length(0, &self))?;
-
-                Ok(Cpu {
-                    reg: reg,
-                    ..Default::default()
-                })
-            }
-        }
-
-        const FIELDS: &'static [&'static str] = &["reg"];
-        deserializer.deserialize_struct("gba_rs::cpu::Cpu", FIELDS, CpuVisitor { phantom: PhantomData })
     }
 }
 
