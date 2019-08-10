@@ -421,16 +421,16 @@ impl<T: Mmu> Cpu<T> {
                     // store
                     debug_assert!(s == 0 && h == 1);
                     let val = self.reg[rd].wrapping_add(((rd == reg::PC) as u32) * 8);
-                    self.mmu.set16(addr, val as u16);
+                    self.mmu.set16(addr & !1, val as u16);
                 } else {
                     self.reg[rd] = match (s, h) {
                         (0, 0) /* SWP */ => unreachable!(),
-                        (0, 1) /* halfword load */  => self.mmu.load16(addr) as u32,
+                        (0, 1) /* halfword load */  => self.mmu.load16(addr & !1) as u32,
                         (1, 0) /* signed byte */    => {
                             self.mmu.load8(addr) as i8 as u32
                         },
                         (1, 1) /* signed half */    => {
-                            self.mmu.load16(addr) as i16 as u32
+                            self.mmu.load16(addr & !1) as i16 as u32
                         },
                         _ => unreachable!()
                     };
