@@ -231,7 +231,7 @@ impl<T: Mmu> Cpu<T> {
                     let rd = extract(inst, 12, 4) as Reg;
                     self.reg[rd] = self.reg[rs];
                 } else {
-                    let i = bit(inst, 26);
+                    let i = bit(inst, 25);
                     let f = bit(inst, 19);
                     let c = bit(inst, 16);
 
