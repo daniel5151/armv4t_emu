@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 
 use shared::Shared;
 
-use mmu::Mmu;
+use mmu::MemoryUnit;
 
 pub mod mode;
 pub mod exception;
@@ -20,16 +20,16 @@ use self::reg::*;
 use self::exception::Exception;
 
 #[derive(Serialize, Deserialize)]
-pub struct Cpu<T: Mmu> {
+pub struct Cpu<T: MemoryUnit> {
     reg: RegFile,
-    #[serde(skip, default = "Default::default")]
+    #[serde(skip, default="Shared::empty")]
     mmu: Shared<T>,
     #[serde(skip)]
     brk: HashSet<u32>,
 }
 
-impl<T: Mmu> Cpu<T> {
-    pub fn new<'a, I>(mmu: Shared<T>, regs: I) -> Cpu<T>
+impl<T: MemoryUnit> Cpu<T> {
+    pub fn new<'a, I>(mmu: Shared<T>, regs: I) -> Self
     where
         I: IntoIterator<Item = &'a (usize, Reg, u32)>,
     {
@@ -132,6 +132,10 @@ impl<T: Mmu> Cpu<T> {
     fn thumb_mode(&self) -> bool {
         (self.reg[reg::CPSR] & (1u32 << cpsr::T)) != 0
     }
+
+    pub fn get_prefetch_addr(&self) -> u32 {
+        self.reg[reg::PC] + if self.thumb_mode() { 2 } else { 4 }
+    }
 }
 
 // These are functions to set breakpoints on for debugging
@@ -142,7 +146,7 @@ fn at_cycle() {}
 pub mod test {
     use super::*;
 
-    impl<T: Mmu> Cpu<T> {
+    impl<T: MemoryUnit> Cpu<T> {
         pub fn run(&mut self) {
             let mut run = true;
             while run {

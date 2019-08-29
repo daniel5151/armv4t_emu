@@ -91,7 +91,7 @@ impl Instruction {
     }
 }
 
-impl<T: Mmu> Cpu<T> {
+impl<T: MemoryUnit> Cpu<T> {
     /// Executes one instruction and returns whether the CPU should continue
     /// executing.
     pub fn execute_thumb(&mut self) -> bool {
@@ -525,7 +525,7 @@ mod test {
         ($name:ident, $mem_checks: expr) => {
             #[test]
             fn $name () {
-                use mmu::ram::Ram;
+                use mmu::ram::{Ram, RamUnit};
 
                 use test;
                 test::setup();
@@ -533,8 +533,9 @@ mod test {
                 let prog = include_bytes!(concat!("testdata/",
                                                   stringify!($name),
                                                   ".bin"));
-                let mut mmu = Ram::new_with_data(0x1000, prog);
-                let mut cpu = super::Cpu::new(Shared::new(&mut mmu),
+                let mut mmu = RamUnit { ram: Ram::new_with_data(0x1000, prog) };
+                let mut cpu = super::Cpu::new(
+                    Shared::new(&mut mmu),
                     // Start at 0, with a stack pointer, and in thumb mode
                     &[(0, reg::PC, 0x0u32),
                       (0, reg::SP, 0x200),

@@ -1,8 +1,8 @@
-use mmu::Mmu;
+use mmu::MemoryUnit;
 
 use super::Cpu;
 
-impl<T: Mmu> Cpu<T> {
+impl<T: MemoryUnit> Cpu<T> {
     // FIXME: other sizes should likely also have
     // centralized behaviour for unaligned access
     pub(super) fn load32(&self, addr: u32) -> u32 {
