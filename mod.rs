@@ -127,7 +127,7 @@ impl<T: MemoryUnit> Cpu<T> {
         self.reg.get(0, reg::CPSR) & (1 << 7) == 0
     }
 
-    fn thumb_mode(&self) -> bool {
+    pub fn thumb_mode(&self) -> bool {
         (self.reg[reg::CPSR] & (1u32 << cpsr::T)) != 0
     }
 
