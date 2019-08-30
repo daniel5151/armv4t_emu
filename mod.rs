@@ -1,8 +1,6 @@
 use std::collections::HashSet;
 use std::default::Default;
-use std::fmt;
 use std::iter::IntoIterator;
-use std::marker::PhantomData;
 
 use shared::Shared;
 
