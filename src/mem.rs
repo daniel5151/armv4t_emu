@@ -1,4 +1,4 @@
-use mmu::MemoryUnit;
+use super::MemoryUnit;
 
 use super::Cpu;
 

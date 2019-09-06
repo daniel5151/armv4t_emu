@@ -2,9 +2,18 @@ use std::collections::HashSet;
 use std::default::Default;
 use std::iter::IntoIterator;
 
-use shared::Shared;
+use serde_derive::{Serialize, Deserialize};
+use log::*;
 
-use mmu::MemoryUnit;
+/// A memory interface
+pub trait MemoryUnit {
+    fn load8(&self, addr: u32) -> u8;
+    fn set8(&mut self, addr: u32, val: u8);
+    fn load16(&self, addr: u32) -> u16;
+    fn set16(&mut self, addr: u32, val: u16);
+    fn load32(&self, addr: u32) -> u32;
+    fn set32(&mut self, addr: u32, val: u32);
+}
 
 pub mod mode;
 pub mod exception;
@@ -13,6 +22,10 @@ mod arm;
 mod thumb;
 mod util;
 mod mem;
+mod bit_util;
+
+#[cfg(test)]
+mod testmod;
 
 use self::reg::*;
 use self::exception::Exception;
@@ -20,14 +33,14 @@ use self::exception::Exception;
 #[derive(Serialize, Deserialize)]
 pub struct Cpu<T: MemoryUnit> {
     reg: RegFile,
-    #[serde(skip, default="Shared::empty")]
-    mmu: Shared<T>,
+    #[serde(skip)]
+    mmu: T,
     #[serde(skip)]
     brk: HashSet<u32>,
 }
 
 impl<T: MemoryUnit> Cpu<T> {
-    pub fn new<'a, I>(mmu: Shared<T>, regs: I) -> Self
+    pub fn new<'a, I>(mmu: T, regs: I) -> Self
     where
         I: IntoIterator<Item = &'a (usize, Reg, u32)>,
     {

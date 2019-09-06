@@ -1,4 +1,4 @@
-use bit_util::*;
+use crate::bit_util::*;
 
 use super::reg::cpsr;
 

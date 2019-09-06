@@ -1,4 +1,5 @@
 use bit_util::*;
+use log::*;
 
 use super::*;
 use super::reg::*;
@@ -525,17 +526,17 @@ mod test {
         ($name:ident, $mem_checks: expr) => {
             #[test]
             fn $name () {
-                use mmu::ram::{Ram, RamUnit};
+                use crate::testmod;
+                use crate::testmod::ram::Ram;
 
-                use test;
-                test::setup();
+                testmod::setup();
 
                 let prog = include_bytes!(concat!("testdata/",
                                                   stringify!($name),
                                                   ".bin"));
-                let mut mmu = RamUnit { ram: Ram::new_with_data(0x1000, prog) };
+                let mmu = Ram::new_with_data(0x1000, prog);
                 let mut cpu = super::Cpu::new(
-                    Shared::new(&mut mmu),
+                    mmu,
                     // Start at 0, with a stack pointer, and in thumb mode
                     &[(0, reg::PC, 0x0u32),
                       (0, reg::SP, 0x200),

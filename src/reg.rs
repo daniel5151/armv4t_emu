@@ -7,8 +7,7 @@ use serde::ser::SerializeTuple;
 use serde::de;
 use serde::de::{Visitor, SeqAccess};
 
-
-use bit_util::extract;
+use crate::bit_util::extract;
 
 use super::mode::Mode;
 

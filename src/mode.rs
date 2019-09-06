@@ -1,3 +1,5 @@
+use log::*;
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Mode {
     User,
