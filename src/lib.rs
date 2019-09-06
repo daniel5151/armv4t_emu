@@ -54,6 +54,8 @@ pub trait Memory {
 }
 
 /// A Emulated ARM7-TDMI CPU
+///
+/// TODO: add an example
 #[derive(Serialize, Deserialize)]
 pub struct Cpu<T: Memory> {
     /// Registers
@@ -67,7 +69,7 @@ pub struct Cpu<T: Memory> {
 }
 
 impl<T: Memory> Cpu<T> {
-    /// Create a new ARM7TDMI CPU with given Memory
+    /// Create a new ARM7TDMI CPU
     pub fn new<'a, I>(mmu: T, regs: I) -> Self
     where
         I: IntoIterator<Item = &'a (usize, Reg, u32)>,
