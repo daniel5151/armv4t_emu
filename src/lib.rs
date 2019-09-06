@@ -2,8 +2,8 @@ use std::collections::HashSet;
 use std::default::Default;
 use std::iter::IntoIterator;
 
-use serde_derive::{Serialize, Deserialize};
 use log::*;
+use serde_derive::{Deserialize, Serialize};
 
 /// A memory interface
 pub trait MemoryUnit {
@@ -15,20 +15,19 @@ pub trait MemoryUnit {
     fn set32(&mut self, addr: u32, val: u32);
 }
 
-pub mod mode;
-pub mod exception;
-pub mod reg;
 mod arm;
+pub mod exception;
+mod mem;
+pub mod mode;
+pub mod reg;
 mod thumb;
 mod util;
-mod mem;
-mod bit_util;
 
 #[cfg(test)]
 mod testmod;
 
-use self::reg::*;
 use self::exception::Exception;
+use self::reg::*;
 
 #[derive(Serialize, Deserialize)]
 pub struct Cpu<T: MemoryUnit> {
@@ -63,15 +62,13 @@ impl<T: MemoryUnit> Cpu<T> {
     /// Initializes the registers to emulate booting through BIOS, to directly
     /// start a ROM
     pub fn init_direct(&mut self) {
-        self.init(
-            &[
-                (0, reg::PC, 0x8000000),
-                (0, reg::CPSR, 0x1f),
-                (0, reg::SP, 0x3007f00),
-                (2, reg::SP, 0x3007fa0),
-                (3, reg::SP, 0x3007fe0),
-            ],
-        );
+        self.init(&[
+            (0, reg::PC, 0x8000000),
+            (0, reg::CPSR, 0x1f),
+            (0, reg::SP, 0x3007f00),
+            (2, reg::SP, 0x3007fa0),
+            (3, reg::SP, 0x3007fe0),
+        ]);
     }
 
     fn init<'a, I>(&mut self, regs: I)

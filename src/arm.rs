@@ -1,10 +1,12 @@
 use log::*;
-use bit_util::*;
 
-use super::*;
-use super::reg::*;
-use super::util::*;
-use super::mode::Mode;
+use crate::util::arm::*;
+use crate::util::bit::*;
+
+use crate::exception::Exception;
+use crate::mode::Mode;
+use crate::reg::{self, cpsr, Reg};
+use crate::{Cpu, MemoryUnit};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum Instruction {
@@ -19,8 +21,8 @@ enum Instruction {
     MulLong,
     SingleXferI, // Single data transfer, immediate offset
     SingleXferR, // Single data transfer, register offset
-    HwSgnXferR, // Halfword and signed, register offset
-    HwSgnXferI, // Halfword and signed, immediate offset
+    HwSgnXferR,  // Halfword and signed, register offset
+    HwSgnXferI,  // Halfword and signed, immediate offset
     BlockXfer,
     Swap,
     SoftwareInt,
@@ -97,10 +99,7 @@ impl<T: MemoryUnit> Cpu<T> {
 
         debug!(
             "ARM: pc: {:#010x}, inst: {:#010x}, cond: {:#03x}, cflags: {:04b}",
-            pc,
-            inst,
-            cond,
-            cflags
+            pc, inst, cond, cflags
         );
 
         self.reg[reg::PC] = self.reg[reg::PC].wrapping_add(4);
@@ -266,13 +265,9 @@ impl<T: MemoryUnit> Cpu<T> {
                 let rs = extract(inst, 8, 4) as Reg;
                 let rm = extract(inst, 0, 4) as Reg;
 
-                let res = self.reg[rm].wrapping_mul(self.reg[rs]).wrapping_add(
-                    if a == 0 {
-                        0
-                    } else {
-                        self.reg[rn]
-                    },
-                );
+                let res = self.reg[rm]
+                    .wrapping_mul(self.reg[rs])
+                    .wrapping_add(if a == 0 { 0 } else { self.reg[rn] });
 
                 self.reg[rd] = res;
 
@@ -595,19 +590,15 @@ mod test {
     macro_rules! emutest {
         ($name:ident, $mem_checks: expr) => {
             #[test]
-            fn $name () {
+            fn $name() {
                 use crate::testmod;
                 use crate::testmod::ram::Ram;
 
                 testmod::setup();
 
-                let prog = include_bytes!(concat!("testdata/",
-                                                  stringify!($name),
-                                                  ".bin"));
+                let prog = include_bytes!(concat!("testdata/", stringify!($name), ".bin"));
                 let mmu = Ram::new_with_data(0x1000, prog);
-                let mut cpu = super::Cpu::new(
-                    mmu,
-                    &[(0, reg::PC, 0x0u32), (0, reg::CPSR, 0x10)]);
+                let mut cpu = super::Cpu::new(mmu, &[(0, reg::PC, 0x0u32), (0, reg::CPSR, 0x10)]);
                 cpu.run();
 
                 let mem = &cpu.mmu;
@@ -615,7 +606,7 @@ mod test {
                     assert_eq!(val, mem.load32(addr), "addr: {:#010x}", addr);
                 }
             }
-        }
+        };
     }
 
     emutest!(emutest_arm0, [(0x100, 5), (0x104, 0)]);

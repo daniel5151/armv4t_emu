@@ -1,6 +1,4 @@
-use super::MemoryUnit;
-
-use super::Cpu;
+use crate::{Cpu, MemoryUnit};
 
 impl<T: MemoryUnit> Cpu<T> {
     // FIXME: other sizes should likely also have

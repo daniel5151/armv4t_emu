@@ -2,14 +2,12 @@ use std::default::Default;
 use std::fmt;
 use std::ops::{Index, IndexMut};
 
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use serde::de::{self, SeqAccess, Visitor};
 use serde::ser::SerializeTuple;
-use serde::de;
-use serde::de::{Visitor, SeqAccess};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::bit_util::extract;
-
-use super::mode::Mode;
+use crate::mode::Mode;
+use crate::util::bit::extract;
 
 pub type Reg = u8;
 
@@ -111,7 +109,8 @@ impl<'de> Deserialize<'de> for RegFile {
                     bank: 0,
                 };
                 for i in 0..NUM_RGSR {
-                    reg.reg[i] = seq.next_element()?
+                    reg.reg[i] = seq
+                        .next_element()?
                         .ok_or_else(|| de::Error::invalid_length(i, &self))?;
                 }
                 reg.update_bank();

@@ -1,4 +1,4 @@
-use super::mode::Mode;
+use crate::mode::Mode;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq)]
