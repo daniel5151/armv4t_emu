@@ -1,5 +1,5 @@
 #![allow(
-    clippy::cognitive_complexity, // big instruction decode methods
+    clippy::cognitive_complexity, // instruction decode methods are large
     clippy::many_single_char_names, // ...it's a CPU, what do you expect?
     clippy::cast_lossless, // Register types _won't_ be changed in the future
     clippy::identity_op, // there are times it makes the code line up better

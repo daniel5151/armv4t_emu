@@ -1,7 +1,7 @@
 use log::*;
 
 use crate::util::arm::*;
-use crate::util::bit::*;
+use crate::util::bit::BitUtilExt;
 
 use crate::exception::Exception;
 use crate::reg::{self, cpsr, Reg};
@@ -86,7 +86,7 @@ impl Instruction {
     fn decode(inst: u16) -> Instruction {
         for typ in INST_MATCH_ORDER.iter() {
             let (mask, test) = typ.pattern();
-            if mask_match(inst as u32, mask as u32, test as u32) {
+            if (inst as u32).mask_match(mask as u32, test as u32) {
                 return *typ;
             }
         }
@@ -101,8 +101,8 @@ impl<T: Memory> Cpu<T> {
         let pc = self.reg[reg::PC];
         let inst = self.mmu.load16(pc) as u32;
         let cpsr = self.reg[reg::CPSR];
-        let c = bit(cpsr, cpsr::C);
-        let v = bit(cpsr, cpsr::V);
+        let c = cpsr.get_bit(cpsr::C);
+        let v = cpsr.get_bit(cpsr::V);
 
         debug!("THM: pc: {:#010x}, inst: {:#06x}", pc, inst,);
 
@@ -115,17 +115,17 @@ impl<T: Memory> Cpu<T> {
         macro_rules! set_flags {
             ($res: expr , $new_v: expr , $new_c: expr) => {
                 let new_z = ($res == 0) as u32;
-                let new_n = is_neg($res) as u32;
+                let new_n = u32::is_neg($res) as u32;
                 let new_flags = build_flags($new_v, $new_c, new_z, new_n);
-                self.reg[reg::CPSR] = set(self.reg[reg::CPSR], 28, 4, new_flags);
+                self.reg[reg::CPSR] = self.reg[reg::CPSR].set_bit(28, 4, new_flags);
             };
         };
         match inst_type {
             Shifted => {
-                let op = extract(inst, 11, 2);
-                let shift = extract(inst, 6, 5);
-                let rs = extract(inst, 3, 3) as Reg;
-                let rd = extract(inst, 0, 3) as Reg;
+                let op = inst.extract(11, 2);
+                let shift = inst.extract(6, 5);
+                let rs = inst.extract(3, 3) as Reg;
+                let rd = inst.extract(0, 3) as Reg;
 
                 let val = self.reg[rs];
 
@@ -140,18 +140,18 @@ impl<T: Memory> Cpu<T> {
                 set_flags!(res, v, new_c);
             }
             AddSub => {
-                let i = bit(inst, 10);
-                let op = bit(inst, 9);
+                let i = inst.get_bit(10);
+                let op = inst.get_bit(9);
 
-                let rs = extract(inst, 3, 3) as Reg;
-                let rd = extract(inst, 0, 3) as Reg;
+                let rs = inst.extract(3, 3) as Reg;
+                let rd = inst.extract(0, 3) as Reg;
 
-                let rn = extract(inst, 6, 3) as Reg;
+                let rn = inst.extract(6, 3) as Reg;
                 let val2 = if i == 0 { self.reg[rn] } else { rn as u32 };
 
                 let (res, new_v, new_c) = match op {
-                    0 => add_flags(self.reg[rs], val2, 0),
-                    1 => sub_flags(self.reg[rs], val2, 0),
+                    0 => self.reg[rs].add_flags(val2, 0),
+                    1 => self.reg[rs].sub_flags(val2, 0),
                     _ => unreachable!(),
                 };
 
@@ -159,15 +159,15 @@ impl<T: Memory> Cpu<T> {
                 set_flags!(res, new_v, new_c);
             }
             ImmOp => {
-                let op = extract(inst, 11, 2);
-                let rd = extract(inst, 8, 3) as Reg;
-                let imm = extract(inst, 0, 8);
+                let op = inst.extract(11, 2);
+                let rd = inst.extract(8, 3) as Reg;
+                let imm = inst.extract(0, 8);
 
                 let (res, new_v, new_c) = match op {
                     0 /* MOV */ => (imm, v, c),
                     1 /* CMP */ |
-                    3 /* SUB */ => sub_flags(self.reg[rd], imm, 0),
-                    2 /* ADD */ => add_flags(self.reg[rd], imm, 0),
+                    3 /* SUB */ => self.reg[rd].sub_flags(imm, 0),
+                    2 /* ADD */ => self.reg[rd].add_flags(imm, 0),
                     _ => unreachable!(),
                 };
 
@@ -178,9 +178,9 @@ impl<T: Memory> Cpu<T> {
                 set_flags!(res, new_v, new_c);
             }
             AluOp => {
-                let op = extract(inst, 6, 4);
-                let rs = extract(inst, 3, 3) as Reg;
-                let rd = extract(inst, 0, 3) as Reg;
+                let op = inst.extract(6, 4);
+                let rs = inst.extract(3, 3) as Reg;
+                let rd = inst.extract(0, 3) as Reg;
 
                 let vals = self.reg[rs];
                 let vald = self.reg[rd];
@@ -202,11 +202,11 @@ impl<T: Memory> Cpu<T> {
                         };
                         (res, v, new_c)
                     },
-                    0x5 /* ADC */ => add_flags(vald, vals, c),
-                    0x6 /* SBC */ => sub_flags(vald, vals, 1-c),
-                    0x9 /* NEG */ => sub_flags(0, vals, 0),
-                    0xA /* CMP */ => sub_flags(vald, vals, 0),
-                    0xB /* CMN */ => add_flags(vald, vals, 0),
+                    0x5 /* ADC */ => vald.add_flags(vals, c),
+                    0x6 /* SBC */ => vald.sub_flags(vals, 1-c),
+                    0x9 /* NEG */ => 0.sub_flags(vals, 0),
+                    0xA /* CMP */ => vald.sub_flags(vals, 0),
+                    0xB /* CMN */ => vald.add_flags(vals, 0),
                     0xC /* ORR */ => (vald | vals, v, c),
                     0xD /* MUL */ => (vald.wrapping_mul(vals), v, 0),
                     0xE /* BIC */ => (vald & !vals, v, c),
@@ -222,11 +222,11 @@ impl<T: Memory> Cpu<T> {
                 set_flags!(res, new_v, new_c);
             }
             HiRegBx => {
-                let op = extract(inst, 8, 2);
-                let hd = bit(inst, 7);
-                let hs = bit(inst, 6);
-                let rs = extract(inst, 3, 3) as Reg;
-                let rd = extract(inst, 0, 3) as Reg;
+                let op = inst.extract(8, 2);
+                let hd = inst.get_bit(7);
+                let hs = inst.get_bit(6);
+                let rs = inst.extract(3, 3) as Reg;
+                let rd = inst.extract(0, 3) as Reg;
 
                 let crs = ((hs * 8) as Reg) + rs;
                 let crd = ((hd * 8) as Reg) + rd;
@@ -236,12 +236,12 @@ impl<T: Memory> Cpu<T> {
                 match op {
                     0 /* ADD */ => self.reg[crd] = self.reg[crd].wrapping_add(vals),
                     1 /* CMP */ => {
-                        let (res, new_v, new_c) = sub_flags(self.reg[crd], vals, 0);
+                        let (res, new_v, new_c) = self.reg[crd].sub_flags( vals, 0);
                         set_flags!(res, new_v, new_c);
                     },
                     2 /* MOV */ => self.reg[crd] = vals,
                     3 /* BX */ => {
-                        let new_t = bit(vals, 0);
+                        let new_t = vals.get_bit( 0);
                         let mask: u32 = if new_t == 0 { !3 } else { !1 };
 
                         self.reg[reg::PC] = vals & mask;
@@ -256,20 +256,20 @@ impl<T: Memory> Cpu<T> {
                 }
             }
             PcLoad => {
-                let rd = extract(inst, 8, 3) as Reg;
-                let offset = extract(inst, 0, 8);
+                let rd = inst.extract(8, 3) as Reg;
+                let offset = inst.extract(0, 8);
 
                 let addr = self.reg[reg::PC].wrapping_add(2).wrapping_add(offset * 4) & !3;
 
                 self.reg[rd] = self.load32(addr);
             }
             SingleXferR => {
-                let l = bit(inst, 11);
-                let b = bit(inst, 10);
+                let l = inst.get_bit(11);
+                let b = inst.get_bit(10);
 
-                let ro = extract(inst, 6, 3) as Reg;
-                let rb = extract(inst, 3, 3) as Reg;
-                let rd = extract(inst, 0, 3) as Reg;
+                let ro = inst.extract(6, 3) as Reg;
+                let rb = inst.extract(3, 3) as Reg;
+                let rd = inst.extract(0, 3) as Reg;
 
                 let offset = self.reg[ro];
                 let addr = self.reg[rb].wrapping_add(offset);
@@ -288,12 +288,12 @@ impl<T: Memory> Cpu<T> {
                 };
             }
             HwSgnXfer => {
-                let h = bit(inst, 11);
-                let s = bit(inst, 10);
+                let h = inst.get_bit(11);
+                let s = inst.get_bit(10);
 
-                let ro = extract(inst, 6, 3) as Reg;
-                let rb = extract(inst, 3, 3) as Reg;
-                let rd = extract(inst, 0, 3) as Reg;
+                let ro = inst.extract(6, 3) as Reg;
+                let rb = inst.extract(3, 3) as Reg;
+                let rd = inst.extract(0, 3) as Reg;
 
                 let offset = self.reg[ro];
                 let addr = self.reg[rb].wrapping_add(offset);
@@ -307,12 +307,12 @@ impl<T: Memory> Cpu<T> {
                 }
             }
             SingleXferI => {
-                let l = bit(inst, 11);
-                let b = bit(inst, 12);
+                let l = inst.get_bit(11);
+                let b = inst.get_bit(12);
 
-                let offset = extract(inst, 6, 5);
-                let rb = extract(inst, 3, 3) as Reg;
-                let rd = extract(inst, 0, 3) as Reg;
+                let offset = inst.extract(6, 5);
+                let rb = inst.extract(3, 3) as Reg;
+                let rd = inst.extract(0, 3) as Reg;
 
                 if b == 0 {
                     let addr = self.reg[rb].wrapping_add(offset * 4);
@@ -332,11 +332,11 @@ impl<T: Memory> Cpu<T> {
                 }
             }
             HwXferI => {
-                let l = bit(inst, 11);
+                let l = inst.get_bit(11);
 
-                let offset = extract(inst, 6, 5);
-                let rb = extract(inst, 3, 3) as Reg;
-                let rd = extract(inst, 0, 3) as Reg;
+                let offset = inst.extract(6, 5);
+                let rb = inst.extract(3, 3) as Reg;
+                let rd = inst.extract(0, 3) as Reg;
 
                 let addr = self.reg[rb].wrapping_add(offset * 2) & !1;
                 if l == 0 {
@@ -346,10 +346,10 @@ impl<T: Memory> Cpu<T> {
                 }
             }
             SpXfer => {
-                let l = bit(inst, 11);
+                let l = inst.get_bit(11);
 
-                let rd = extract(inst, 8, 3) as Reg;
-                let offset = extract(inst, 0, 8) * 4;
+                let rd = inst.extract(8, 3) as Reg;
+                let offset = inst.extract(0, 8) * 4;
 
                 let addr = self.reg[reg::SP].wrapping_add(offset);
 
@@ -361,9 +361,9 @@ impl<T: Memory> Cpu<T> {
                 }
             }
             LoadAddr => {
-                let s = bit(inst, 11);
-                let rd = extract(inst, 8, 3) as Reg;
-                let imm = extract(inst, 0, 8);
+                let s = inst.get_bit(11);
+                let rd = inst.extract(8, 3) as Reg;
+                let imm = inst.extract(0, 8);
 
                 let base = if s == 0 {
                     self.reg[reg::PC].wrapping_add(2) & !2
@@ -374,8 +374,8 @@ impl<T: Memory> Cpu<T> {
                 self.reg[rd] = base.wrapping_add(imm * 4);
             }
             SpAdd => {
-                let s = bit(inst, 7);
-                let imm = extract(inst, 0, 7) * 4;
+                let s = inst.get_bit(7);
+                let imm = inst.extract(0, 7) * 4;
 
                 let sp = self.reg[reg::SP];
 
@@ -386,10 +386,10 @@ impl<T: Memory> Cpu<T> {
                 };
             }
             PushPop => {
-                let l = bit(inst, 11);
-                let r = bit(inst, 8);
+                let l = inst.get_bit(11);
+                let r = inst.get_bit(8);
 
-                let rlist = extract(inst, 0, 8);
+                let rlist = inst.extract(0, 8);
 
                 let total = rlist.count_ones() + r;
 
@@ -426,10 +426,10 @@ impl<T: Memory> Cpu<T> {
                 self.reg[reg::SP] = post_addr;
             }
             BlockXfer => {
-                let l = bit(inst, 11);
-                let rb = extract(inst, 8, 3) as Reg;
+                let l = inst.get_bit(11);
+                let rb = inst.extract(8, 3) as Reg;
 
-                let rlist = extract(inst, 0, 8);
+                let rlist = inst.extract(0, 8);
 
                 let total = rlist.count_ones();
 
@@ -457,8 +457,8 @@ impl<T: Memory> Cpu<T> {
                 }
             }
             CondBranch => {
-                let cond = extract(inst, 8, 4);
-                let offset = extract(inst, 0, 8) as i8 as u32;
+                let cond = inst.extract(8, 4);
+                let offset = inst.extract(0, 8) as i8 as u32;
 
                 if cond_met(cond, cpsr) {
                     self.reg[reg::PC] = pc.wrapping_add(4).wrapping_add(offset << 1);
@@ -468,18 +468,18 @@ impl<T: Memory> Cpu<T> {
                 self.exception(Exception::Software);
             }
             Branch => {
-                let offset = sign_extend(extract(inst, 0, 11) << 1, 12);
+                let offset = (inst.extract(0, 11) << 1).sign_extend(12);
 
                 self.reg[reg::PC] = pc.wrapping_add(4).wrapping_add(offset);
             }
             LongBranch => {
-                let h = bit(inst, 11);
-                let offset = extract(inst, 0, 11);
+                let h = inst.get_bit(11);
+                let offset = inst.extract(0, 11);
 
                 if h == 0 {
                     self.reg[reg::LR] = pc
                         .wrapping_add(4)
-                        .wrapping_add(sign_extend(offset << 12, 23));
+                        .wrapping_add((offset << 12).sign_extend(23));
                 } else {
                     self.reg[reg::PC] = self.reg[reg::LR].wrapping_add(offset << 1);
                     self.reg[reg::LR] = pc.wrapping_add(2) | 1;
@@ -572,15 +572,15 @@ mod test {
             (0x1fc, 0x200),
         ]
     );
-    emutest!(emutest_thm1, [(0x200, 0xdeadbeef)]);
+    emutest!(emutest_thm1, [(0x200, 0xdead_beef)]);
     emutest!(
         emutest_thm2,
-        [(0x200, 0xff00), (0x204, 0xff80), (0x208, 0x7fffff80)]
+        [(0x200, 0xff00), (0x204, 0xff80), (0x208, 0x7fff_ff80)]
     );
     emutest!(emutest_thm3, [(0x1f8, 8), (0x1fc, 0x200), (0x200, 64)]);
     emutest!(emutest_thm4, [(0x200, 4), (0x204, 5)]);
     emutest!(emutest_thm5, [(0x200, 10), (0x204, 83)]);
     emutest!(emutest_thm6, [(0x1fc, 0)]);
     emutest!(emutest_thm7, [(0x1fc, 0xff)]);
-    emutest!(emutest_thm8, [(0x1fc, 0x01234567)]);
+    emutest!(emutest_thm8, [(0x1fc, 0x0123_4567)]);
 }

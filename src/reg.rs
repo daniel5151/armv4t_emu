@@ -7,7 +7,7 @@ use serde::ser::SerializeTuple;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::mode::Mode;
-use crate::util::bit::extract;
+use crate::util::bit::BitUtilExt;
 
 pub type Reg = u8;
 
@@ -37,7 +37,7 @@ pub struct RegFile {
 impl RegFile {
     #[inline]
     pub fn mode(&self) -> Mode {
-        Mode::from_bits(extract(self.reg[CPSR as usize], 0, 5) as u8)
+        Mode::from_bits(self.reg[CPSR as usize].extract(0, 5) as u8)
     }
 
     #[inline]
