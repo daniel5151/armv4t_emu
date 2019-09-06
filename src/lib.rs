@@ -5,21 +5,12 @@ use std::iter::IntoIterator;
 use log::*;
 use serde_derive::{Deserialize, Serialize};
 
-/// A memory interface
-pub trait MemoryUnit {
-    fn load8(&self, addr: u32) -> u8;
-    fn set8(&mut self, addr: u32, val: u8);
-    fn load16(&self, addr: u32) -> u16;
-    fn set16(&mut self, addr: u32, val: u16);
-    fn load32(&self, addr: u32) -> u32;
-    fn set32(&mut self, addr: u32, val: u32);
-}
-
-mod arm;
 pub mod exception;
-mod mem;
 pub mod mode;
 pub mod reg;
+
+mod arm;
+mod mem;
 mod thumb;
 mod util;
 
@@ -29,16 +20,46 @@ mod testmod;
 use self::exception::Exception;
 use self::reg::*;
 
+/// Initial registers state according to the ARM documentation.
+/// http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.faqs/ka3761.html
+pub const ARM_INIT: &[(usize, Reg, u32)] = &[(0, reg::PC, 0), (0, reg::CPSR, 0xd3)];
+
+/// Initial register to emulate booting through BIOS
+/// (for booting directly into GBA ROMs)
+pub const GBA_INIT: &[(usize, Reg, u32)] = &[
+    (0, reg::PC, 0x8000000),
+    (0, reg::CPSR, 0x1f),
+    (0, reg::SP, 0x3007f00),
+    (2, reg::SP, 0x3007fa0),
+    (3, reg::SP, 0x3007fe0),
+];
+
+/// Standard memory access trait.
+/// TODO: tweak signature to support access violations / open bus behavior.
+pub trait Memory {
+    fn set8(&mut self, addr: u32, val: u8);
+    fn set16(&mut self, addr: u32, val: u16);
+    fn set32(&mut self, addr: u32, val: u32);
+    fn load8(&self, addr: u32) -> u8;
+    fn load16(&self, addr: u32) -> u16;
+    fn load32(&self, addr: u32) -> u32;
+}
+
+/// A Emulated ARM7-TDMI CPU
 #[derive(Serialize, Deserialize)]
-pub struct Cpu<T: MemoryUnit> {
+pub struct Cpu<T: Memory> {
+    /// Registers
     reg: RegFile,
+    /// Memory interface
     #[serde(skip)]
     mmu: T,
+    /// Breakpoints
     #[serde(skip)]
     brk: HashSet<u32>,
 }
 
-impl<T: MemoryUnit> Cpu<T> {
+impl<T: Memory> Cpu<T> {
+    /// Create a new ARM7TDMI CPU with given Memory
     pub fn new<'a, I>(mmu: T, regs: I) -> Self
     where
         I: IntoIterator<Item = &'a (usize, Reg, u32)>,
@@ -48,40 +69,16 @@ impl<T: MemoryUnit> Cpu<T> {
             mmu: mmu,
             brk: Default::default(),
         };
-        cpu.init(regs);
+
+        // load any custom register values
+        for &(bank, reg, val) in regs.into_iter() {
+            cpu.reg.set(bank, reg, val);
+        }
 
         cpu
     }
 
-    /// Initializes registers according to the ARM documentation
-    pub fn init_arm(&mut self) {
-        // http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.faqs/ka3761.html
-        self.init(&[(0, reg::PC, 0), (0, reg::CPSR, 0xd3)]);
-    }
-
-    /// Initializes the registers to emulate booting through BIOS, to directly
-    /// start a ROM
-    pub fn init_direct(&mut self) {
-        self.init(&[
-            (0, reg::PC, 0x8000000),
-            (0, reg::CPSR, 0x1f),
-            (0, reg::SP, 0x3007f00),
-            (2, reg::SP, 0x3007fa0),
-            (3, reg::SP, 0x3007fe0),
-        ]);
-    }
-
-    fn init<'a, I>(&mut self, regs: I)
-    where
-        I: IntoIterator<Item = &'a (usize, Reg, u32)>,
-    {
-        // start in system mode
-        self.reg.set(0, reg::CPSR, 0x1F);
-        for &(bank, reg, val) in regs.into_iter() {
-            self.reg.set(bank, reg, val);
-        }
-    }
-
+    /// Add breakpoints at certain memory addresses
     pub fn set_breaks<'a, I>(&mut self, brks: I)
     where
         I: IntoIterator<Item = &'a u32>,
@@ -91,6 +88,7 @@ impl<T: MemoryUnit> Cpu<T> {
         }
     }
 
+    /// Tick the CPU a single cycle
     pub fn cycle(&mut self) -> bool {
         if self.brk.contains(&self.reg[reg::PC]) {
             warn!("Breakpoint {:#010x} hit!", self.reg[reg::PC]);
@@ -105,14 +103,14 @@ impl<T: MemoryUnit> Cpu<T> {
         }
     }
 
+    /// Trigger an exception
     pub fn exception(&mut self, exc: &Exception) {
         // this should already be pointing at the next instruction
         let new_mode = exc.mode_on_entry();
         let new_bank = new_mode.reg_bank();
 
         let cpsr = self.reg.get(0, reg::CPSR);
-        // instruction that just executed + (2/4 depending on
-        // thumb vs arm)
+        // instruction that just executed + (2/4 depending on thumb vs arm)
         let pc = self.reg.get(0, reg::PC);
 
         let new_lr = match *exc {
@@ -133,10 +131,12 @@ impl<T: MemoryUnit> Cpu<T> {
         self.reg.set(0, reg::CPSR, new_cpsr);
     }
 
+    /// Check if IRQs are enabled
     pub fn irq_enable(&self) -> bool {
         self.reg.get(0, reg::CPSR) & (1 << 7) == 0
     }
 
+    /// Check if CPU is currently in Thumb mode
     pub fn thumb_mode(&self) -> bool {
         (self.reg[reg::CPSR] & (1u32 << cpsr::T)) != 0
     }
@@ -149,23 +149,3 @@ impl<T: MemoryUnit> Cpu<T> {
 // These are functions to set breakpoints on for debugging
 fn at_breakpoint() {}
 fn at_cycle() {}
-
-#[cfg(test)]
-pub mod test {
-    use super::*;
-
-    impl<T: MemoryUnit> Cpu<T> {
-        pub fn run(&mut self) {
-            let mut run = true;
-            while run {
-                run = self.cycle();
-            }
-        }
-
-        pub fn set_thumb_mode(&mut self, thumb: bool) {
-            let mask = 1u32 << cpsr::T;
-            let cpsr = self.reg[reg::CPSR];
-            self.reg[reg::CPSR] = (cpsr & !mask) | ((thumb as u32) * mask);
-        }
-    }
-}

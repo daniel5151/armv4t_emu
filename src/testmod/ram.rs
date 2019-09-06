@@ -3,7 +3,7 @@ use std::vec::Vec;
 use byteorder::{ByteOrder, LittleEndian};
 use serde_derive::{Deserialize, Serialize};
 
-use crate::MemoryUnit;
+use crate::Memory;
 
 /// Implements a basic memory model with no memory mapping
 #[derive(Serialize, Deserialize)]
@@ -25,7 +25,7 @@ impl Ram {
     }
 }
 
-impl MemoryUnit for Ram {
+impl Memory for Ram {
     fn load8(&self, addr: u32) -> u8 {
         let idx = addr as usize;
         if idx < self.mem.len() {

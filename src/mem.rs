@@ -1,6 +1,6 @@
-use crate::{Cpu, MemoryUnit};
+use crate::{Cpu, Memory};
 
-impl<T: MemoryUnit> Cpu<T> {
+impl<T: Memory> Cpu<T> {
     // FIXME: other sizes should likely also have
     // centralized behaviour for unaligned access
     pub(super) fn load32(&self, addr: u32) -> u32 {

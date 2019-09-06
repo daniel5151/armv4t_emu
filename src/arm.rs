@@ -6,7 +6,7 @@ use crate::util::bit::*;
 use crate::exception::Exception;
 use crate::mode::Mode;
 use crate::reg::{self, cpsr, Reg};
-use crate::{Cpu, MemoryUnit};
+use crate::{Cpu, Memory};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum Instruction {
@@ -85,7 +85,7 @@ impl Instruction {
     }
 }
 
-impl<T: MemoryUnit> Cpu<T> {
+impl<T: Memory> Cpu<T> {
     /// Executes one instruction and returns whether the CPU should continue
     /// executing.
     pub fn execute_arm(&mut self) -> bool {
@@ -599,7 +599,8 @@ mod test {
                 let prog = include_bytes!(concat!("testdata/", stringify!($name), ".bin"));
                 let mmu = Ram::new_with_data(0x1000, prog);
                 let mut cpu = super::Cpu::new(mmu, &[(0, reg::PC, 0x0u32), (0, reg::CPSR, 0x10)]);
-                cpu.run();
+
+                while cpu.cycle() {}
 
                 let mem = &cpu.mmu;
                 for &(addr, val) in ($mem_checks).iter() {

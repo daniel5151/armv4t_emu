@@ -5,7 +5,7 @@ use crate::util::bit::*;
 
 use crate::exception::Exception;
 use crate::reg::{self, cpsr, Reg};
-use crate::{Cpu, MemoryUnit};
+use crate::{Cpu, Memory};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum Instruction {
@@ -94,7 +94,7 @@ impl Instruction {
     }
 }
 
-impl<T: MemoryUnit> Cpu<T> {
+impl<T: Memory> Cpu<T> {
     /// Executes one instruction and returns whether the CPU should continue
     /// executing.
     pub fn execute_thumb(&mut self) -> bool {
@@ -546,8 +546,13 @@ mod test {
                         (0, reg::CPSR, 0x10),
                     ],
                 );
-                cpu.set_thumb_mode(true);
-                cpu.run();
+
+                // set thumb mode
+                let mask = 1u32 << cpsr::T;
+                let cpsr = cpu.reg[reg::CPSR];
+                cpu.reg[reg::CPSR] = (cpsr & !mask) | mask;
+
+                while cpu.cycle() {}
 
                 let mem = &cpu.mmu;
                 for &(addr, val) in ($mem_checks).iter() {
