@@ -56,10 +56,10 @@ const INST_MATCH_ORDER: [Instruction; 20] = [
 
 impl Instruction {
     #[inline]
-    fn pattern(&self) -> (u16, u16) {
+    fn pattern(self) -> (u16, u16) {
         use self::Instruction::*;
         #[cfg_attr(rustfmt, rustfmt_skip)]
-        match *self {
+        match self {
             Shifted     => (0xe000, 0x0000),
             AddSub      => (0xf800, 0x1800),
             ImmOp       => (0xe000, 0x2000),
@@ -87,7 +87,7 @@ impl Instruction {
         for typ in INST_MATCH_ORDER.iter() {
             let (mask, test) = typ.pattern();
             if mask_match(inst as u32, mask as u32, test as u32) {
-                return typ.clone();
+                return *typ;
             }
         }
         Instruction::Undefined
@@ -465,7 +465,7 @@ impl<T: Memory> Cpu<T> {
                 }
             }
             SoftwareInt => {
-                self.exception(&Exception::Software);
+                self.exception(Exception::Software);
             }
             Branch => {
                 let offset = sign_extend(extract(inst, 0, 11) << 1, 12);

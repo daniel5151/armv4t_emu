@@ -50,27 +50,27 @@ const INST_MATCH_ORDER: [Instruction; 17] = [
 ];
 
 impl Instruction {
-    fn pattern(&self) -> (u32, u32) {
+    fn pattern(self) -> (u32, u32) {
         use self::Instruction::*;
         #[cfg_attr(rustfmt, rustfmt_skip)]
-        match *self {
-            BranchEx    => (0x0ffffff0, 0x012fff10),
-            Branch      => (0x0e000000, 0x0a000000),
-            DataProc0   => (0x0e000010, 0x00000000),
-            DataProc1   => (0x0e000090, 0x00000010),
-            DataProc2   => (0x0e000000, 0x02000000),
-            PsrImm      => (0x0fb00000, 0x03200000),
-            PsrReg      => (0x0f900ff0, 0x01000000),
-            Multiply    => (0x0fc000f0, 0x00000090),
-            MulLong     => (0x0f8000f0, 0x00800090),
-            SingleXferI => (0x0e000000, 0x04000000),
-            SingleXferR => (0x0e000010, 0x06000000),
-            HwSgnXferR  => (0x0e400f90, 0x00000090),
-            HwSgnXferI  => (0x0e400090, 0x00400090),
-            BlockXfer   => (0x0e000000, 0x08000000),
-            Swap        => (0x0fb00ff0, 0x01000090),
-            SoftwareInt => (0x0f000000, 0x0f000000),
-            Undefined   => (0x00000000, 0x00000000),
+        match self {
+            BranchEx    => (0x0fff_fff0, 0x012f_ff10),
+            Branch      => (0x0e00_0000, 0x0a00_0000),
+            DataProc0   => (0x0e00_0010, 0x0000_0000),
+            DataProc1   => (0x0e00_0090, 0x0000_0010),
+            DataProc2   => (0x0e00_0000, 0x0200_0000),
+            PsrImm      => (0x0fb0_0000, 0x0320_0000),
+            PsrReg      => (0x0f90_0ff0, 0x0100_0000),
+            Multiply    => (0x0fc0_00f0, 0x0000_0090),
+            MulLong     => (0x0f80_00f0, 0x0080_0090),
+            SingleXferI => (0x0e00_0000, 0x0400_0000),
+            SingleXferR => (0x0e00_0010, 0x0600_0000),
+            HwSgnXferR  => (0x0e40_0f90, 0x0000_0090),
+            HwSgnXferI  => (0x0e40_0090, 0x0040_0090),
+            BlockXfer   => (0x0e00_0000, 0x0800_0000),
+            Swap        => (0x0fb0_0ff0, 0x0100_0090),
+            SoftwareInt => (0x0f00_0000, 0x0f00_0000),
+            Undefined   => (0x0000_0000, 0x0000_0000),
         }
     }
 
@@ -78,7 +78,7 @@ impl Instruction {
         for typ in INST_MATCH_ORDER.iter() {
             let (mask, test) = typ.pattern();
             if mask_match(inst, mask, test) {
-                return typ.clone();
+                return *typ;
             }
         }
         Instruction::Undefined
@@ -118,7 +118,7 @@ impl<T: Memory> Cpu<T> {
                 let new_pc = self.reg[rn];
                 self.reg[reg::PC] = self.reg[rn] & !1u32;
                 // maybe switch to thumb mode
-                self.reg[reg::CPSR] = self.reg[reg::CPSR] | (bit(new_pc, 0) << cpsr::T);
+                self.reg[reg::CPSR] |= bit(new_pc, 0) << cpsr::T;
             }
             Branch => {
                 let l = bit(inst, 24);
@@ -238,7 +238,7 @@ impl<T: Memory> Cpu<T> {
                     // user mode can't change the control bits
                     let ctrl = ((self.reg.mode() != Mode::User) as u32) * c;
 
-                    let mask = 0xf0000000 * f + 0x000000ff * ctrl;
+                    let mask = 0xf000_0000 * f + 0xf000_0000 * ctrl;
 
                     let val = if i == 0 {
                         let rm = extract(inst, 0, 4) as Reg;
@@ -545,7 +545,7 @@ impl<T: Memory> Cpu<T> {
                 self.reg[rd] = val;
             }
             SoftwareInt => {
-                self.exception(&Exception::Software);
+                self.exception(Exception::Software);
             }
             Undefined => return false,
         };

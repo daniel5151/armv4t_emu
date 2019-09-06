@@ -1,3 +1,11 @@
+#![allow(
+    clippy::cognitive_complexity, // big instruction decode methods
+    clippy::many_single_char_names, // ...it's a CPU, what do you expect?
+    clippy::cast_lossless, // Register types _won't_ be changed in the future
+    clippy::identity_op, // there are times it makes the code line up better
+    clippy::deprecated_cfg_attr,
+)]
+
 use std::collections::HashSet;
 use std::default::Default;
 use std::iter::IntoIterator;
@@ -27,11 +35,11 @@ pub const ARM_INIT: &[(usize, Reg, u32)] = &[(0, reg::PC, 0), (0, reg::CPSR, 0xd
 /// Initial register to emulate booting through BIOS
 /// (for booting directly into GBA ROMs)
 pub const GBA_INIT: &[(usize, Reg, u32)] = &[
-    (0, reg::PC, 0x8000000),
+    (0, reg::PC, 0x0800_0000),
     (0, reg::CPSR, 0x1f),
-    (0, reg::SP, 0x3007f00),
-    (2, reg::SP, 0x3007fa0),
-    (3, reg::SP, 0x3007fe0),
+    (0, reg::SP, 0x0300_7f00),
+    (2, reg::SP, 0x0300_7fa0),
+    (3, reg::SP, 0x0300_7fe0),
 ];
 
 /// Standard memory access trait.
@@ -66,7 +74,7 @@ impl<T: Memory> Cpu<T> {
     {
         let mut cpu = Cpu {
             reg: Default::default(),
-            mmu: mmu,
+            mmu,
             brk: Default::default(),
         };
 
@@ -104,7 +112,7 @@ impl<T: Memory> Cpu<T> {
     }
 
     /// Trigger an exception
-    pub fn exception(&mut self, exc: &Exception) {
+    pub fn exception(&mut self, exc: Exception) {
         // this should already be pointing at the next instruction
         let new_mode = exc.mode_on_entry();
         let new_bank = new_mode.reg_bank();
@@ -113,7 +121,7 @@ impl<T: Memory> Cpu<T> {
         // instruction that just executed + (2/4 depending on thumb vs arm)
         let pc = self.reg.get(0, reg::PC);
 
-        let new_lr = match *exc {
+        let new_lr = match exc {
             Exception::Interrupt => pc + 4,
             _ => pc,
         };
