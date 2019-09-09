@@ -11,7 +11,7 @@ use std::default::Default;
 use std::iter::IntoIterator;
 
 use log::*;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 pub mod exception;
 pub mod mode;
