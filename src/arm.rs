@@ -594,12 +594,12 @@ mod test {
         ($name:ident, $mem_checks: expr) => {
             #[test]
             fn $name() {
-                use crate::testmod;
-                use crate::testmod::ram::Ram;
+                use crate::tests;
+                use crate::tests::ram::Ram;
 
-                testmod::setup();
+                tests::setup();
 
-                let prog = include_bytes!(concat!("testdata/", stringify!($name), ".bin"));
+                let prog = include_bytes!(concat!("tests/data/", stringify!($name), ".bin"));
                 let mmu = Ram::new_with_data(prog);
                 let mut cpu = super::Cpu::new(mmu, &[(0, reg::PC, 0x0u32), (0, reg::CPSR, 0x10)]);
 

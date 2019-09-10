@@ -5,6 +5,7 @@
     clippy::identity_op, // there are times it makes the code line up better
     clippy::deprecated_cfg_attr,
 )]
+#![warn(clippy::bad_bit_mask)]
 
 use std::collections::HashSet;
 use std::default::Default;
@@ -23,7 +24,7 @@ mod thumb;
 mod util;
 
 #[cfg(test)]
-mod testmod;
+mod tests;
 
 use self::exception::Exception;
 use self::reg::*;
