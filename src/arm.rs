@@ -90,28 +90,31 @@ impl<T: Memory> Cpu<T> {
     /// executing.
     pub fn execute_arm(&mut self) -> bool {
         let pc = self.reg[reg::PC];
-        let inst = self.mmu.load32(pc);
+        let inst = self.mmu.r32(pc);
         // Decode first
         let cond = inst.extract(28, 4);
 
         let cpsr = self.reg[reg::CPSR];
         let cflags = cpsr.extract(28, 4);
 
-        debug!(
+        trace!(
             "ARM: pc: {:#010x}, inst: {:#010x}, cond: {:#03x}, cflags: {:04b}",
-            pc, inst, cond, cflags
+            pc,
+            inst,
+            cond,
+            cflags
         );
 
         self.reg[reg::PC] = self.reg[reg::PC].wrapping_add(4);
 
         if !cond_met(cond, cpsr) {
-            debug!("cond not met");
+            trace!("cond not met");
             return true;
         }
 
         use self::Instruction::*;
         let inst_type = self::Instruction::decode(inst);
-        debug!("Instruction: {:?}", inst_type);
+        trace!("Instruction: {:?}", inst_type);
         match inst_type {
             BranchEx => {
                 let rn = inst.extract(0, 4) as Reg;
@@ -368,15 +371,15 @@ impl<T: Memory> Cpu<T> {
                     let val = self.reg[rd].wrapping_add(((rd == reg::PC) as u32) * 8);
                     if b == 0 {
                         // force alignment of the store
-                        self.set32(addr, val);
+                        self.w32(addr, val);
                     } else {
-                        self.mmu.set8(addr, val as u8);
+                        self.mmu.w8(addr, val as u8);
                     };
                 } else {
                     self.reg[rd] = if b == 0 {
-                        self.load32(addr)
+                        self.r32(addr)
                     } else {
-                        self.mmu.load8(addr) as u32
+                        self.mmu.r8(addr) as u32
                     };
                 };
 
@@ -417,16 +420,16 @@ impl<T: Memory> Cpu<T> {
                     // store
                     debug_assert!(s == 0 && h == 1);
                     let val = self.reg[rd].wrapping_add(((rd == reg::PC) as u32) * 8);
-                    self.mmu.set16(addr & !1, val as u16);
+                    self.mmu.w16(addr & !1, val as u16);
                 } else {
                     self.reg[rd] = match (s, h) {
                         (0, 0) /* SWP */ => unreachable!(),
-                        (0, 1) /* halfword load */  => self.mmu.load16(addr & !1) as u32,
+                        (0, 1) /* halfword load */  => self.mmu.r16(addr & !1) as u32,
                         (1, 0) /* signed byte */    => {
-                            self.mmu.load8(addr) as i8 as u32
+                            self.mmu.r8(addr) as i8 as u32
                         },
                         (1, 1) /* signed half */    => {
-                            self.mmu.load16(addr & !1) as i16 as u32
+                            self.mmu.r16(addr & !1) as i16 as u32
                         },
                         _ => unreachable!()
                     };
@@ -490,10 +493,10 @@ impl<T: Memory> Cpu<T> {
                             } else {
                                 self.reg[r]
                             };
-                            self.set32(idx_addr, val);
+                            self.w32(idx_addr, val);
                         } else {
                             // load
-                            self.reg[r] = self.load32(idx_addr);
+                            self.reg[r] = self.r32(idx_addr);
                             if r == reg::PC && s == 1 {
                                 self.reg[reg::CPSR] = self.reg[reg::SPSR];
                             }
@@ -510,10 +513,10 @@ impl<T: Memory> Cpu<T> {
                         if l == 0 {
                             // store
                             let val = self.reg.get(0, r);
-                            self.set32(idx_addr, val);
+                            self.w32(idx_addr, val);
                         } else {
                             // load
-                            let val = self.load32(idx_addr);
+                            let val = self.r32(idx_addr);
                             self.reg.set(0, r, val);
                         };
                         rem -= 1u32 << r;
@@ -531,14 +534,14 @@ impl<T: Memory> Cpu<T> {
                 let addr = self.reg[rn] & !((1 - b) * 3);
 
                 let val = match b {
-                    0 => self.load32(addr),
-                    1 => self.mmu.load8(addr) as u32,
+                    0 => self.r32(addr),
+                    1 => self.mmu.r8(addr) as u32,
                     _ => unreachable!(),
                 };
                 let oval = self.reg[rm];
                 match b {
-                    0 => self.set32(addr, oval),
-                    1 => self.mmu.set8(addr, oval as u8),
+                    0 => self.w32(addr, oval),
+                    1 => self.mmu.w8(addr, oval as u8),
                     _ => unreachable!(),
                 };
 
@@ -597,14 +600,14 @@ mod test {
                 testmod::setup();
 
                 let prog = include_bytes!(concat!("testdata/", stringify!($name), ".bin"));
-                let mmu = Ram::new_with_data(0x1000, prog);
+                let mmu = Ram::new_with_data(prog);
                 let mut cpu = super::Cpu::new(mmu, &[(0, reg::PC, 0x0u32), (0, reg::CPSR, 0x10)]);
 
                 while cpu.cycle() {}
 
-                let mem = &cpu.mmu;
+                let mem = &mut cpu.mmu;
                 for &(addr, val) in ($mem_checks).iter() {
-                    assert_eq!(val, mem.load32(addr), "addr: {:#010x}", addr);
+                    assert_eq!(val, mem.r32(addr), "addr: {:#010x}", addr);
                 }
             }
         };

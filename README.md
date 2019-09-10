@@ -13,4 +13,4 @@ TODO: show an example
 - [ ] co-processor instructions
 - [ ] cycle accuracy
     - [ ] accurate prefetching
-- [ ] endianesss configuration (currently fixed to little endian)
+- [ ] support configuring endianness (currently fixed to little endian)

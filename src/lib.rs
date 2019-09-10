@@ -42,15 +42,50 @@ pub const GBA_INIT: &[(usize, Reg, u32)] = &[
     (3, reg::SP, 0x0300_7fe0),
 ];
 
-/// Standard memory access trait.
-/// TODO: tweak signature to support access violations / open bus behavior.
+/// Memory access trait.
+/// Accesses are all Little Endian.
+///
+/// Provides default implementations for storing/loading 16bit and 32bit values,
+/// though overrides can be provided for more efficient implementations (e.g:
+/// reading from a slice / vector)
+///
+/// TODO: tweak signature to support access violations / open bus behavior?
 pub trait Memory {
-    fn set8(&mut self, addr: u32, val: u8);
-    fn set16(&mut self, addr: u32, val: u16);
-    fn set32(&mut self, addr: u32, val: u32);
-    fn load8(&self, addr: u32) -> u8;
-    fn load16(&self, addr: u32) -> u16;
-    fn load32(&self, addr: u32) -> u32;
+    /// Write a 8-bit `val` to `addr`
+    fn w8(&mut self, addr: u32, val: u8);
+    /// Read a 8-bit value from `addr`
+    fn r8(&mut self, addr: u32) -> u8;
+    /// Peek a 8-bit value from `addr`
+    fn p8(&self, addr: u32) -> u8;
+
+    /// Write a 16-bit `val` to `addr`
+    fn w16(&mut self, addr: u32, val: u16) {
+        self.w8(addr, val as u8);
+        self.w8(addr + 1, (val >> 8) as u8);
+    }
+    /// Write a 32-bit `val` to `addr`
+    fn w32(&mut self, addr: u32, val: u32) {
+        self.w16(addr, val as u16);
+        self.w16(addr + 2, (val >> 16) as u16);
+    }
+
+    /// Read a 16-bit value from `addr`
+    fn r16(&mut self, addr: u32) -> u16 {
+        self.r8(addr) as u16 | (self.r8(addr + 1) as u16) << 8
+    }
+    /// Read a 32-bit value from `addr`
+    fn r32(&mut self, addr: u32) -> u32 {
+        self.r16(addr) as u32 | (self.r16(addr + 2) as u32) << 16
+    }
+
+    /// Peek a 16-bit value from `addr`
+    fn p16(&self, addr: u32) -> u16 {
+        self.p8(addr) as u16 | (self.p8(addr + 1) as u16) << 8
+    }
+    /// Peek a 32-bit value from `addr`
+    fn p32(&self, addr: u32) -> u32 {
+        self.p16(addr) as u32 | (self.p16(addr + 2) as u32) << 16
+    }
 }
 
 /// A Emulated ARM7-TDMI CPU
@@ -153,6 +188,14 @@ impl<T: Memory> Cpu<T> {
 
     pub fn get_prefetch_addr(&self) -> u32 {
         self.reg[reg::PC] + if self.thumb_mode() { 2 } else { 4 }
+    }
+
+    pub fn borrow_mmu(&self) -> &T {
+        &self.mmu
+    }
+
+    pub fn borrow_mut_mmu(&mut self) -> &mut T {
+        &mut self.mmu
     }
 }
 

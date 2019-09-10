@@ -3,10 +3,10 @@ use crate::{Cpu, Memory};
 impl<T: Memory> Cpu<T> {
     // FIXME: other sizes should likely also have
     // centralized behaviour for unaligned access
-    pub(super) fn load32(&self, addr: u32) -> u32 {
+    pub(super) fn r32(&mut self, addr: u32) -> u32 {
         let a = addr & !3;
 
-        let val = self.mmu.load32(a);
+        let val = self.mmu.r32(a);
         if a == addr {
             val
         } else {
@@ -15,7 +15,7 @@ impl<T: Memory> Cpu<T> {
         }
     }
 
-    pub(super) fn set32(&mut self, addr: u32, val: u32) {
-        self.mmu.set32(addr & !3, val);
+    pub(super) fn w32(&mut self, addr: u32, val: u32) {
+        self.mmu.w32(addr & !3, val);
     }
 }

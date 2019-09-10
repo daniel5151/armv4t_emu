@@ -99,18 +99,18 @@ impl<T: Memory> Cpu<T> {
     /// executing.
     pub fn execute_thumb(&mut self) -> bool {
         let pc = self.reg[reg::PC];
-        let inst = self.mmu.load16(pc) as u32;
+        let inst = self.mmu.r16(pc) as u32;
         let cpsr = self.reg[reg::CPSR];
         let c = cpsr.get_bit(cpsr::C);
         let v = cpsr.get_bit(cpsr::V);
 
-        debug!("THM: pc: {:#010x}, inst: {:#06x}", pc, inst,);
+        trace!("THM: pc: {:#010x}, inst: {:#06x}", pc, inst,);
 
         self.reg[reg::PC] = self.reg[reg::PC].wrapping_add(2);
 
         use self::Instruction::*;
         let inst_type = self::Instruction::decode(inst as u16);
-        debug!("Instruction: {:?}", inst_type);
+        trace!("Instruction: {:?}", inst_type);
 
         macro_rules! set_flags {
             ($res: expr , $new_v: expr , $new_c: expr) => {
@@ -261,7 +261,7 @@ impl<T: Memory> Cpu<T> {
 
                 let addr = self.reg[reg::PC].wrapping_add(2).wrapping_add(offset * 4) & !3;
 
-                self.reg[rd] = self.load32(addr);
+                self.reg[rd] = self.r32(addr);
             }
             SingleXferR => {
                 let l = inst.get_bit(11);
@@ -276,14 +276,14 @@ impl<T: Memory> Cpu<T> {
                 match (l, b) {
                     (0, 0) => {
                         let v = self.reg[rd];
-                        self.set32(addr, v)
+                        self.w32(addr, v)
                     }
                     (0, 1) => {
                         let v = self.reg[rd];
-                        self.mmu.set8(addr, v as u8)
+                        self.mmu.w8(addr, v as u8)
                     }
-                    (1, 0) => self.reg[rd] = self.load32(addr),
-                    (1, 1) => self.reg[rd] = self.mmu.load8(addr) as u32,
+                    (1, 0) => self.reg[rd] = self.r32(addr),
+                    (1, 1) => self.reg[rd] = self.mmu.r8(addr) as u32,
                     _ => unreachable!(),
                 };
             }
@@ -299,10 +299,10 @@ impl<T: Memory> Cpu<T> {
                 let addr = self.reg[rb].wrapping_add(offset);
 
                 match (s, h) {
-                    (0, 0) => self.mmu.set16(addr & !1, self.reg[rd] as u16),
-                    (0, 1) => self.reg[rd] = self.mmu.load16(addr & !1) as u32,
-                    (1, 0) => self.reg[rd] = self.mmu.load8(addr) as i8 as u32,
-                    (1, 1) => self.reg[rd] = self.mmu.load16(addr & !1) as i16 as u32,
+                    (0, 0) => self.mmu.w16(addr & !1, self.reg[rd] as u16),
+                    (0, 1) => self.reg[rd] = self.mmu.r16(addr & !1) as u32,
+                    (1, 0) => self.reg[rd] = self.mmu.r8(addr) as i8 as u32,
+                    (1, 1) => self.reg[rd] = self.mmu.r16(addr & !1) as i16 as u32,
                     _ => unreachable!(),
                 }
             }
@@ -318,16 +318,16 @@ impl<T: Memory> Cpu<T> {
                     let addr = self.reg[rb].wrapping_add(offset * 4);
                     if l == 0 {
                         let val = self.reg[rd];
-                        self.set32(addr, val);
+                        self.w32(addr, val);
                     } else {
-                        self.reg[rd] = self.load32(addr);
+                        self.reg[rd] = self.r32(addr);
                     }
                 } else {
                     let addr = self.reg[rb].wrapping_add(offset);
                     if l == 0 {
-                        self.mmu.set8(addr, self.reg[rd] as u8);
+                        self.mmu.w8(addr, self.reg[rd] as u8);
                     } else {
-                        self.reg[rd] = self.mmu.load8(addr) as u32;
+                        self.reg[rd] = self.mmu.r8(addr) as u32;
                     }
                 }
             }
@@ -340,9 +340,9 @@ impl<T: Memory> Cpu<T> {
 
                 let addr = self.reg[rb].wrapping_add(offset * 2) & !1;
                 if l == 0 {
-                    self.mmu.set16(addr, self.reg[rd] as u16);
+                    self.mmu.w16(addr, self.reg[rd] as u16);
                 } else {
-                    self.reg[rd] = self.mmu.load16(addr) as u32;
+                    self.reg[rd] = self.mmu.r16(addr) as u32;
                 }
             }
             SpXfer => {
@@ -355,9 +355,9 @@ impl<T: Memory> Cpu<T> {
 
                 if l == 0 {
                     let val = self.reg[rd];
-                    self.set32(addr, val);
+                    self.w32(addr, val);
                 } else {
-                    self.reg[rd] = self.load32(addr);
+                    self.reg[rd] = self.r32(addr);
                 }
             }
             LoadAddr => {
@@ -414,10 +414,9 @@ impl<T: Memory> Cpu<T> {
                     let idx_addr = addr.wrapping_add(i * 4);
                     if l == 0 {
                         let val = self.reg[reg];
-                        self.set32(idx_addr, val);
+                        self.w32(idx_addr, val);
                     } else {
-                        self.reg[reg] =
-                            self.load32(idx_addr) & if reg == reg::PC { !1 } else { !0 };
+                        self.reg[reg] = self.r32(idx_addr) & if reg == reg::PC { !1 } else { !0 };
                     }
 
                     rem -= 1 << reg;
@@ -448,9 +447,9 @@ impl<T: Memory> Cpu<T> {
                         } else {
                             self.reg[reg]
                         };
-                        self.set32(idx_addr, val);
+                        self.w32(idx_addr, val);
                     } else {
-                        self.reg[reg] = self.load32(idx_addr);
+                        self.reg[reg] = self.r32(idx_addr);
                     }
 
                     rem -= 1 << reg;
@@ -536,7 +535,7 @@ mod test {
                 testmod::setup();
 
                 let prog = include_bytes!(concat!("testdata/", stringify!($name), ".bin"));
-                let mmu = Ram::new_with_data(0x1000, prog);
+                let mmu = Ram::new_with_data(prog);
                 let mut cpu = super::Cpu::new(
                     mmu,
                     // Start at 0, with a stack pointer, and in thumb mode
@@ -554,9 +553,9 @@ mod test {
 
                 while cpu.cycle() {}
 
-                let mem = &cpu.mmu;
+                let mem = &mut cpu.mmu;
                 for &(addr, val) in ($mem_checks).iter() {
-                    assert_eq!(val, mem.load32(addr), "addr: {:#010x}", addr);
+                    assert_eq!(val, mem.r32(addr), "addr: {:#010x}", addr);
                 }
             }
         };
