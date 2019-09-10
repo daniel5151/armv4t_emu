@@ -5,7 +5,7 @@
     clippy::identity_op, // there are times it makes the code line up better
     clippy::deprecated_cfg_attr,
 )]
-#![warn(clippy::bad_bit_mask)]
+#![warn(clippy::bad_bit_mask)] // TODO: remove this once warning is resolved
 
 use std::collections::HashSet;
 use std::default::Default;
@@ -18,14 +18,15 @@ pub mod exception;
 pub mod mode;
 pub mod reg;
 
+mod alignment;
 mod arm;
-mod mem;
 mod thumb;
 mod util;
 
 #[cfg(test)]
 mod tests;
 
+use self::alignment::AlignmentWrapper;
 use self::exception::Exception;
 use self::reg::*;
 
@@ -93,26 +94,19 @@ pub trait Memory {
 ///
 /// TODO: add an example
 #[derive(Serialize, Deserialize)]
-pub struct Cpu<T: Memory> {
+pub struct Cpu {
     /// Registers
     reg: RegFile,
-    /// Memory interface
-    #[serde(skip)]
-    mmu: T,
     /// Breakpoints
     #[serde(skip)]
     brk: HashSet<u32>,
 }
 
-impl<T: Memory> Cpu<T> {
+impl Cpu {
     /// Create a new ARM7TDMI CPU
-    pub fn new<'a, I>(mmu: T, regs: I) -> Self
-    where
-        I: IntoIterator<Item = &'a (usize, Reg, u32)>,
-    {
+    pub fn new<'a>(regs: impl IntoIterator<Item = &'a (usize, Reg, u32)>) -> Self {
         let mut cpu = Cpu {
             reg: Default::default(),
-            mmu,
             brk: Default::default(),
         };
 
@@ -125,27 +119,26 @@ impl<T: Memory> Cpu<T> {
     }
 
     /// Add breakpoints at certain memory addresses
-    pub fn set_breaks<'a, I>(&mut self, brks: I)
-    where
-        I: IntoIterator<Item = &'a u32>,
-    {
+    pub fn set_breaks<'a>(&mut self, brks: impl IntoIterator<Item = &'a u32>) {
         for addr in brks.into_iter() {
             self.brk.insert(*addr);
         }
     }
 
     /// Tick the CPU a single cycle
-    pub fn cycle(&mut self) -> bool {
+    pub fn cycle(&mut self, mmu: &mut impl Memory) -> bool {
         if self.brk.contains(&self.reg[reg::PC]) {
             warn!("Breakpoint {:#010x} hit!", self.reg[reg::PC]);
             at_breakpoint();
         }
 
+        let mut mmu = AlignmentWrapper::new(mmu);
+
         at_cycle();
         if !self.thumb_mode() {
-            self.execute_arm()
+            self.execute_arm(&mut mmu)
         } else {
-            self.execute_thumb()
+            self.execute_thumb(&mut mmu)
         }
     }
 
@@ -189,14 +182,6 @@ impl<T: Memory> Cpu<T> {
 
     pub fn get_prefetch_addr(&self) -> u32 {
         self.reg[reg::PC] + if self.thumb_mode() { 2 } else { 4 }
-    }
-
-    pub fn borrow_mmu(&self) -> &T {
-        &self.mmu
-    }
-
-    pub fn borrow_mut_mmu(&mut self) -> &mut T {
-        &mut self.mmu
     }
 }
 

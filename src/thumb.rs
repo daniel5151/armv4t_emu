@@ -94,12 +94,12 @@ impl Instruction {
     }
 }
 
-impl<T: Memory> Cpu<T> {
+impl Cpu {
     /// Executes one instruction and returns whether the CPU should continue
     /// executing.
-    pub fn execute_thumb(&mut self) -> bool {
+    pub fn execute_thumb(&mut self, mmu: &mut impl Memory) -> bool {
         let pc = self.reg[reg::PC];
-        let inst = self.mmu.r16(pc) as u32;
+        let inst = mmu.r16(pc) as u32;
         let cpsr = self.reg[reg::CPSR];
         let c = cpsr.get_bit(cpsr::C);
         let v = cpsr.get_bit(cpsr::V);
@@ -261,7 +261,7 @@ impl<T: Memory> Cpu<T> {
 
                 let addr = self.reg[reg::PC].wrapping_add(2).wrapping_add(offset * 4) & !3;
 
-                self.reg[rd] = self.r32(addr);
+                self.reg[rd] = mmu.r32(addr);
             }
             SingleXferR => {
                 let l = inst.get_bit(11);
@@ -276,14 +276,14 @@ impl<T: Memory> Cpu<T> {
                 match (l, b) {
                     (0, 0) => {
                         let v = self.reg[rd];
-                        self.w32(addr, v)
+                        mmu.w32(addr, v)
                     }
                     (0, 1) => {
                         let v = self.reg[rd];
-                        self.mmu.w8(addr, v as u8)
+                        mmu.w8(addr, v as u8)
                     }
-                    (1, 0) => self.reg[rd] = self.r32(addr),
-                    (1, 1) => self.reg[rd] = self.mmu.r8(addr) as u32,
+                    (1, 0) => self.reg[rd] = mmu.r32(addr),
+                    (1, 1) => self.reg[rd] = mmu.r8(addr) as u32,
                     _ => unreachable!(),
                 };
             }
@@ -299,10 +299,10 @@ impl<T: Memory> Cpu<T> {
                 let addr = self.reg[rb].wrapping_add(offset);
 
                 match (s, h) {
-                    (0, 0) => self.mmu.w16(addr & !1, self.reg[rd] as u16),
-                    (0, 1) => self.reg[rd] = self.mmu.r16(addr & !1) as u32,
-                    (1, 0) => self.reg[rd] = self.mmu.r8(addr) as i8 as u32,
-                    (1, 1) => self.reg[rd] = self.mmu.r16(addr & !1) as i16 as u32,
+                    (0, 0) => mmu.w16(addr & !1, self.reg[rd] as u16),
+                    (0, 1) => self.reg[rd] = mmu.r16(addr & !1) as u32,
+                    (1, 0) => self.reg[rd] = mmu.r8(addr) as i8 as u32,
+                    (1, 1) => self.reg[rd] = mmu.r16(addr & !1) as i16 as u32,
                     _ => unreachable!(),
                 }
             }
@@ -318,16 +318,16 @@ impl<T: Memory> Cpu<T> {
                     let addr = self.reg[rb].wrapping_add(offset * 4);
                     if l == 0 {
                         let val = self.reg[rd];
-                        self.w32(addr, val);
+                        mmu.w32(addr, val);
                     } else {
-                        self.reg[rd] = self.r32(addr);
+                        self.reg[rd] = mmu.r32(addr);
                     }
                 } else {
                     let addr = self.reg[rb].wrapping_add(offset);
                     if l == 0 {
-                        self.mmu.w8(addr, self.reg[rd] as u8);
+                        mmu.w8(addr, self.reg[rd] as u8);
                     } else {
-                        self.reg[rd] = self.mmu.r8(addr) as u32;
+                        self.reg[rd] = mmu.r8(addr) as u32;
                     }
                 }
             }
@@ -340,9 +340,9 @@ impl<T: Memory> Cpu<T> {
 
                 let addr = self.reg[rb].wrapping_add(offset * 2) & !1;
                 if l == 0 {
-                    self.mmu.w16(addr, self.reg[rd] as u16);
+                    mmu.w16(addr, self.reg[rd] as u16);
                 } else {
-                    self.reg[rd] = self.mmu.r16(addr) as u32;
+                    self.reg[rd] = mmu.r16(addr) as u32;
                 }
             }
             SpXfer => {
@@ -355,9 +355,9 @@ impl<T: Memory> Cpu<T> {
 
                 if l == 0 {
                     let val = self.reg[rd];
-                    self.w32(addr, val);
+                    mmu.w32(addr, val);
                 } else {
-                    self.reg[rd] = self.r32(addr);
+                    self.reg[rd] = mmu.r32(addr);
                 }
             }
             LoadAddr => {
@@ -414,9 +414,9 @@ impl<T: Memory> Cpu<T> {
                     let idx_addr = addr.wrapping_add(i * 4);
                     if l == 0 {
                         let val = self.reg[reg];
-                        self.w32(idx_addr, val);
+                        mmu.w32(idx_addr, val);
                     } else {
-                        self.reg[reg] = self.r32(idx_addr) & if reg == reg::PC { !1 } else { !0 };
+                        self.reg[reg] = mmu.r32(idx_addr) & if reg == reg::PC { !1 } else { !0 };
                     }
 
                     rem -= 1 << reg;
@@ -447,9 +447,9 @@ impl<T: Memory> Cpu<T> {
                         } else {
                             self.reg[reg]
                         };
-                        self.w32(idx_addr, val);
+                        mmu.w32(idx_addr, val);
                     } else {
-                        self.reg[reg] = self.r32(idx_addr);
+                        self.reg[reg] = mmu.r32(idx_addr);
                     }
 
                     rem -= 1 << reg;
@@ -535,9 +535,8 @@ mod test {
                 tests::setup();
 
                 let prog = include_bytes!(concat!("tests/data/", stringify!($name), ".bin"));
-                let mmu = Ram::new_with_data(prog);
+                let mut mmu = Ram::new_with_data(prog);
                 let mut cpu = super::Cpu::new(
-                    mmu,
                     // Start at 0, with a stack pointer, and in thumb mode
                     &[
                         (0, reg::PC, 0x0u32),
@@ -551,11 +550,10 @@ mod test {
                 let cpsr = cpu.reg[reg::CPSR];
                 cpu.reg[reg::CPSR] = (cpsr & !mask) | mask;
 
-                while cpu.cycle() {}
+                while cpu.cycle(&mut mmu) {}
 
-                let mem = &mut cpu.mmu;
                 for &(addr, val) in ($mem_checks).iter() {
-                    assert_eq!(val, mem.r32(addr), "addr: {:#010x}", addr);
+                    assert_eq!(val, mmu.r32(addr), "addr: {:#010x}", addr);
                 }
             }
         };
