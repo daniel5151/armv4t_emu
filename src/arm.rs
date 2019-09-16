@@ -91,19 +91,24 @@ impl Cpu {
     pub fn execute_arm(&mut self, mmu: &mut impl Memory) -> bool {
         let pc = self.reg[reg::PC];
         let inst = mmu.r32(pc);
-        // Decode first
+        let inst_type = self::Instruction::decode(inst);
+
         let cond = inst.extract(28, 4);
-
         let cpsr = self.reg[reg::CPSR];
-        let cflags = cpsr.extract(28, 4);
 
-        trace!(
-            "ARM: pc: {:#010x}, inst: {:#010x}, cond: {:#03x}, cflags: {:04b}",
-            pc,
-            inst,
-            cond,
-            cflags
-        );
+        #[cfg(not(feature = "advanced_disasm"))]
+        {
+            let cflags = cpsr.extract(28, 4);
+            trace!(
+                "ARM: pc: {:#010x}, inst: {:#010x}, cond: {:#03x}, cflags: {:04b}",
+                pc,
+                inst,
+                cond,
+                cflags
+            );
+            let inst_type = Instruction::decode(inst);
+            trace!("Instruction: {:?}", inst_type);
+        }
 
         self.reg[reg::PC] = self.reg[reg::PC].wrapping_add(4);
 
@@ -113,8 +118,6 @@ impl Cpu {
         }
 
         use self::Instruction::*;
-        let inst_type = self::Instruction::decode(inst);
-        trace!("Instruction: {:?}", inst_type);
         match inst_type {
             BranchEx => {
                 let rn = inst.extract(0, 4) as Reg;

@@ -8,6 +8,12 @@ Initially written as part of [iburinoc's Gameboy Advance emulator](https://githu
 
 TODO: show an example
 
+## Optional Features
+
+Enabling "advanced_disasm" will bring in [`capstone`](https://github.com/capstone-rust/capstone-rs) as a dependency for more detailed execution logs. It is disabled by default, as it brings in a large C-library as a dependency to this otherwise tiny crate.
+
+TODO: make serde optional
+
 ## TODOs and Missing Functionality
 
 - [ ] co-processor instructions

@@ -1,5 +1,3 @@
-use log::*;
-
 use crate::util::arm::*;
 use crate::util::bit::BitUtilExt;
 
@@ -100,17 +98,19 @@ impl Cpu {
     pub fn execute_thumb(&mut self, mmu: &mut impl Memory) -> bool {
         let pc = self.reg[reg::PC];
         let inst = mmu.r16(pc) as u32;
+        let inst_type = self::Instruction::decode(inst as u16);
         let cpsr = self.reg[reg::CPSR];
         let c = cpsr.get_bit(cpsr::C);
         let v = cpsr.get_bit(cpsr::V);
 
-        trace!("THM: pc: {:#010x}, inst: {:#06x}", pc, inst,);
+        #[cfg(not(feature = "advanced_disasm"))]
+        {
+            use log::*;
+            trace!("THM: pc: {:#010x}, inst: {:#06x}", pc, inst);
+            trace!("Instruction: {:?}", inst_type);
+        }
 
         self.reg[reg::PC] = self.reg[reg::PC].wrapping_add(2);
-
-        use self::Instruction::*;
-        let inst_type = self::Instruction::decode(inst as u16);
-        trace!("Instruction: {:?}", inst_type);
 
         macro_rules! set_flags {
             ($res: expr , $new_v: expr , $new_c: expr) => {
@@ -120,6 +120,8 @@ impl Cpu {
                 self.reg[reg::CPSR] = self.reg[reg::CPSR].set_bit(28, 4, new_flags);
             };
         };
+
+        use self::Instruction::*;
         match inst_type {
             Shifted => {
                 let op = inst.extract(11, 2);

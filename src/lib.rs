@@ -14,6 +14,9 @@ use std::iter::IntoIterator;
 use log::*;
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "advanced_disasm")]
+use capstone::prelude::*;
+
 pub mod exception;
 pub mod mode;
 pub mod reg;
@@ -100,6 +103,10 @@ pub struct Cpu {
     /// Breakpoints
     #[serde(skip)]
     brk: HashSet<u32>,
+    /// Disassembler
+    #[cfg(feature = "advanced_disasm")]
+    #[serde(skip)]
+    cs: Option<Capstone>,
 }
 
 impl Cpu {
@@ -108,6 +115,15 @@ impl Cpu {
         let mut cpu = Cpu {
             reg: Default::default(),
             brk: Default::default(),
+            #[cfg(feature = "advanced_disasm")]
+            cs: Some(
+                Capstone::new()
+                    .arm()
+                    .mode(arch::arm::ArchMode::Arm)
+                    .detail(true)
+                    .build()
+                    .unwrap(),
+            ),
         };
 
         // load any custom register values
@@ -133,6 +149,29 @@ impl Cpu {
         }
 
         let mut mmu = AlignmentWrapper::new(mmu);
+
+        #[cfg(feature = "advanced_disasm")]
+        loop {
+            if log::max_level().to_level() != Some(log::Level::Trace) {
+                break;
+            }
+            let thumb_mode = self.thumb_mode();
+            let cs = self.cs.as_mut().unwrap();
+            if !thumb_mode {
+                cs.set_mode(capstone::Mode::Arm).unwrap();
+            } else {
+                cs.set_mode(capstone::Mode::Thumb).unwrap();
+            }
+            // disasm a single instruction
+            let instr = mmu.p32(self.reg[reg::PC]).to_le_bytes();
+            if let Ok(instr) = cs.disasm_count(&instr, self.reg[reg::PC] as u64, 1) {
+                let s = format!("{}", instr);
+                trace!("{}", s.trim());
+            } else {
+                trace!("failed to disasm instruction");
+            }
+            break;
+        }
 
         at_cycle();
         if !self.thumb_mode() {
@@ -182,6 +221,14 @@ impl Cpu {
 
     pub fn get_prefetch_addr(&self) -> u32 {
         self.reg[reg::PC] + if self.thumb_mode() { 2 } else { 4 }
+    }
+
+    pub fn reg_set(&mut self, bank: usize, reg: Reg, val: u32) {
+        self.reg.set(bank, reg, val)
+    }
+
+    pub fn reg_get(&mut self, bank: usize, reg: Reg) -> u32 {
+        self.reg.get(bank, reg)
     }
 }
 
