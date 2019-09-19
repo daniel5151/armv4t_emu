@@ -109,6 +109,19 @@ impl Cpu {
             let inst_type = Instruction::decode(inst);
             trace!("Instruction: {:?}", inst_type);
         }
+        #[cfg(feature = "advanced_disasm")]
+        {
+            if log::max_level().to_level() == Some(log::Level::Trace) {
+                let cs = self.cs.as_mut().unwrap();
+                cs.set_mode(capstone::Mode::Arm).unwrap();
+                if let Ok(inst) = cs.disasm_count(&inst.to_le_bytes(), pc as u64, 1) {
+                    let s = format!("{}", inst);
+                    trace!("{}", s.trim());
+                } else {
+                    trace!("failed to disasm instruction");
+                }
+            }
+        }
 
         self.reg[reg::PC] = self.reg[reg::PC].wrapping_add(4);
 

@@ -12,16 +12,14 @@ impl<T: Memory> AlignmentWrapper<'_, T> {
 
 impl<T: Memory> Memory for AlignmentWrapper<'_, T> {
     fn r8(&mut self, addr: u32) -> u8 {
+        // TODO: fixme
         self.0.r8(addr)
     }
-    fn p8(&self, addr: u32) -> u8 {
-        self.0.p8(addr)
-    }
-    fn w8(&mut self, addr: u32, val: u8) {
-        self.0.w8(addr, val)
-    }
 
-    // TODO: implement correct halfword behavior
+    fn r16(&mut self, addr: u32) -> u16 {
+        // TODO: fixme
+        self.0.r16(addr)
+    }
 
     fn r32(&mut self, addr: u32) -> u32 {
         let a = addr & !3;
@@ -33,6 +31,16 @@ impl<T: Memory> Memory for AlignmentWrapper<'_, T> {
             let shift = (addr & 3) * 8;
             val.rotate_right(shift)
         }
+    }
+
+    fn w8(&mut self, addr: u32, val: u8) {
+        // TODO: fixme
+        self.0.w8(addr, val)
+    }
+
+    fn w16(&mut self, addr: u32, val: u16) {
+        // TODO: fixme
+        self.0.w16(addr, val)
     }
 
     fn w32(&mut self, addr: u32, val: u32) {

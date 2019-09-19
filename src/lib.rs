@@ -49,48 +49,20 @@ pub const GBA_INIT: &[(usize, Reg, u32)] = &[
 
 /// Memory access trait.
 /// Accesses are all Little Endian.
-///
-/// Provides default implementations for storing/loading 16bit and 32bit values,
-/// though overrides can be provided for more efficient implementations (e.g:
-/// reading from a slice / vector)
-///
-/// TODO: tweak signature to support access violations / open bus behavior?
 pub trait Memory {
-    /// Write a 8-bit `val` to `addr`
-    fn w8(&mut self, addr: u32, val: u8);
     /// Read a 8-bit value from `addr`
     fn r8(&mut self, addr: u32) -> u8;
-    /// Peek a 8-bit value from `addr`
-    fn p8(&self, addr: u32) -> u8;
-
-    /// Write a 16-bit `val` to `addr`
-    fn w16(&mut self, addr: u32, val: u16) {
-        self.w8(addr, val as u8);
-        self.w8(addr + 1, (val >> 8) as u8);
-    }
-    /// Write a 32-bit `val` to `addr`
-    fn w32(&mut self, addr: u32, val: u32) {
-        self.w16(addr, val as u16);
-        self.w16(addr + 2, (val >> 16) as u16);
-    }
-
     /// Read a 16-bit value from `addr`
-    fn r16(&mut self, addr: u32) -> u16 {
-        self.r8(addr) as u16 | (self.r8(addr + 1) as u16) << 8
-    }
+    fn r16(&mut self, addr: u32) -> u16;
     /// Read a 32-bit value from `addr`
-    fn r32(&mut self, addr: u32) -> u32 {
-        self.r16(addr) as u32 | (self.r16(addr + 2) as u32) << 16
-    }
+    fn r32(&mut self, addr: u32) -> u32;
 
-    /// Peek a 16-bit value from `addr`
-    fn p16(&self, addr: u32) -> u16 {
-        self.p8(addr) as u16 | (self.p8(addr + 1) as u16) << 8
-    }
-    /// Peek a 32-bit value from `addr`
-    fn p32(&self, addr: u32) -> u32 {
-        self.p16(addr) as u32 | (self.p16(addr + 2) as u32) << 16
-    }
+    /// Write a 8-bit `val` to `addr`
+    fn w8(&mut self, addr: u32, val: u8);
+    /// Write a 16-bit `val` to `addr`
+    fn w16(&mut self, addr: u32, val: u16);
+    /// Write a 32-bit `val` to `addr`
+    fn w32(&mut self, addr: u32, val: u32);
 }
 
 /// A Emulated ARM7-TDMI CPU
@@ -149,29 +121,6 @@ impl Cpu {
         }
 
         let mut mmu = AlignmentWrapper::new(mmu);
-
-        #[cfg(feature = "advanced_disasm")]
-        loop {
-            if log::max_level().to_level() != Some(log::Level::Trace) {
-                break;
-            }
-            let thumb_mode = self.thumb_mode();
-            let cs = self.cs.as_mut().unwrap();
-            if !thumb_mode {
-                cs.set_mode(capstone::Mode::Arm).unwrap();
-            } else {
-                cs.set_mode(capstone::Mode::Thumb).unwrap();
-            }
-            // disasm a single instruction
-            let instr = mmu.p32(self.reg[reg::PC]).to_le_bytes();
-            if let Ok(instr) = cs.disasm_count(&instr, self.reg[reg::PC] as u64, 1) {
-                let s = format!("{}", instr);
-                trace!("{}", s.trim());
-            } else {
-                trace!("failed to disasm instruction");
-            }
-            break;
-        }
 
         at_cycle();
         if !self.thumb_mode() {

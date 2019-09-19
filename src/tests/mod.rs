@@ -1,8 +1,8 @@
-use std::sync::{Once, ONCE_INIT};
+use std::sync::Once;
 
 pub mod ram;
 
-static INIT: Once = ONCE_INIT;
+static INIT: Once = Once::new();
 
 pub fn setup() {
     INIT.call_once(|| {
