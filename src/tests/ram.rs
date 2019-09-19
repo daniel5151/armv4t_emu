@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 use crate::Memory;
 
 /// A basic infinitely-large hunk of RAM.
 /// Should only be used for tests!
-#[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Ram(HashMap<u32, u8>);
 
 impl Ram {

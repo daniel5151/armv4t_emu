@@ -1,10 +1,12 @@
 use std::default::Default;
-use std::fmt;
 use std::ops::{Index, IndexMut};
 
-use serde::de::{self, SeqAccess, Visitor};
-use serde::ser::SerializeTuple;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+#[cfg(feature = "serde")]
+use serde::{
+    de::{self, SeqAccess, Visitor},
+    ser::SerializeTuple,
+    Deserialize, Deserializer, Serialize, Serializer,
+};
 
 use crate::mode::Mode;
 use crate::util::bit::BitUtilExt;
@@ -83,6 +85,7 @@ impl IndexMut<Reg> for RegFile {
     }
 }
 
+#[cfg(feature = "serde")]
 impl Serialize for RegFile {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut seq = serializer.serialize_tuple(NUM_RGSR)?;
@@ -93,13 +96,14 @@ impl Serialize for RegFile {
     }
 }
 
+#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for RegFile {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         struct RegVisitor;
         impl<'de> Visitor<'de> for RegVisitor {
             type Value = RegFile;
 
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 formatter.write_str("tuple RegFile")
             }
 

@@ -12,6 +12,8 @@ use std::default::Default;
 use std::iter::IntoIterator;
 
 use log::*;
+
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "advanced_disasm")]
@@ -68,16 +70,16 @@ pub trait Memory {
 /// A Emulated ARM7-TDMI CPU
 ///
 /// TODO: add an example
-#[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Cpu {
     /// Registers
     reg: RegFile,
     /// Breakpoints
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde", serde(skip))]
     brk: HashSet<u32>,
     /// Disassembler
     #[cfg(feature = "advanced_disasm")]
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde", serde(skip))]
     cs: Option<Capstone>,
 }
 
