@@ -257,7 +257,7 @@ impl Cpu {
                     // user mode can't change the control bits
                     let ctrl = ((self.reg.mode() != Mode::User) as u32) * c;
 
-                    let mask = 0xf000_0000 * f + 0xf000_0000 * ctrl;
+                    let mask = 0xf000_0000 * f + 0x0000_00ff * ctrl;
 
                     let val = if i == 0 {
                         let rm = inst.extract(0, 4) as Reg;
