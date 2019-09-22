@@ -36,6 +36,33 @@ pub struct RegFile {
     bank: usize,
 }
 
+// This is pretty jank, due to the way registers are stored
+// It could use some improvement.
+impl std::fmt::Debug for RegFile {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let mut builder = fmt.debug_struct("RegFile");
+        builder.field("curr_bank", &self.bank);
+        for (bank, map) in REG_MAP.iter().enumerate() {
+            let mut regs = Vec::new();
+            for reg in map.iter().copied() {
+                match reg as u8 {
+                    SP => regs.push(("SP".to_string(), self.reg[reg])),
+                    LR => regs.push(("LR".to_string(), self.reg[reg])),
+                    PC => regs.push(("PC".to_string(), self.reg[reg])),
+                    CPSR => regs.push(("CPSR".to_string(), self.reg[reg])),
+                    SPSR => regs.push(("SPSR".to_string(), self.reg[reg])),
+                    _ => regs.push((format!("r{}", reg), self.reg[reg])),
+                };
+            }
+            builder.field(
+                format!("bank{}", bank).as_str(),
+                &format!("{:x?}", regs).replace("\"", ""),
+            );
+        }
+        builder.finish()
+    }
+}
+
 impl RegFile {
     #[inline]
     pub fn mode(&self) -> Mode {

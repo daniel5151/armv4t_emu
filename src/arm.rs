@@ -111,7 +111,7 @@ impl Cpu {
         }
         #[cfg(feature = "advanced_disasm")]
         {
-            if log::max_level().to_level() == Some(log::Level::Trace) {
+            if log_enabled!(log::Level::Trace) {
                 let cs = self.cs.as_mut().unwrap();
                 cs.set_mode(capstone::Mode::Arm).unwrap();
                 if let Ok(inst) = cs.disasm_count(&inst.to_le_bytes(), pc as u64, 1) {
