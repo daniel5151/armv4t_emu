@@ -166,7 +166,7 @@ impl Cpu {
         self.reg.set(bank, reg, val)
     }
 
-    pub fn reg_get(&mut self, bank: usize, reg: Reg) -> u32 {
+    pub fn reg_get(&self, bank: usize, reg: Reg) -> u32 {
         self.reg.get(bank, reg)
     }
 }
