@@ -169,4 +169,8 @@ impl Cpu {
     pub fn reg_get(&self, bank: usize, reg: Reg) -> u32 {
         self.reg.get(bank, reg)
     }
+
+    pub fn get_mode(&self) -> mode::Mode {
+        self.reg.mode()
+    }
 }
