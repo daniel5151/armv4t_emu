@@ -7,7 +7,6 @@
 )]
 #![warn(clippy::bad_bit_mask)] // TODO: remove this once warning is resolved
 
-use std::collections::HashSet;
 use std::default::Default;
 use std::iter::IntoIterator;
 
@@ -74,13 +73,16 @@ pub trait Memory {
 pub struct Cpu {
     /// Registers
     reg: RegFile,
-    /// Breakpoints
-    #[cfg_attr(feature = "serde", serde(skip))]
-    brk: HashSet<u32>,
     /// Disassembler
     #[cfg(feature = "advanced_disasm")]
     #[cfg_attr(feature = "serde", serde(skip))]
     cs: Option<Capstone>,
+}
+
+impl std::fmt::Debug for Cpu {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        fmt.debug_struct("Cpu").field("reg", &self.reg).finish()
+    }
 }
 
 impl Cpu {
@@ -88,7 +90,6 @@ impl Cpu {
     pub fn new<'a>(regs: impl IntoIterator<Item = &'a (usize, Reg, u32)>) -> Self {
         let mut cpu = Cpu {
             reg: Default::default(),
-            brk: Default::default(),
             #[cfg(feature = "advanced_disasm")]
             cs: Some(
                 Capstone::new()
@@ -108,23 +109,10 @@ impl Cpu {
         cpu
     }
 
-    /// Add breakpoints at certain memory addresses
-    pub fn set_breaks<'a>(&mut self, brks: impl IntoIterator<Item = &'a u32>) {
-        for addr in brks.into_iter() {
-            self.brk.insert(*addr);
-        }
-    }
-
     /// Tick the CPU a single cycle
     pub fn cycle(&mut self, mmu: &mut impl Memory) -> bool {
-        if self.brk.contains(&self.reg[reg::PC]) {
-            warn!("Breakpoint {:#010x} hit!", self.reg[reg::PC]);
-            at_breakpoint();
-        }
-
         let mut mmu = AlignmentWrapper::new(mmu);
 
-        at_cycle();
         if !self.thumb_mode() {
             self.execute_arm(&mut mmu)
         } else {
@@ -178,11 +166,11 @@ impl Cpu {
         self.reg.set(bank, reg, val)
     }
 
-    pub fn reg_get(&mut self, bank: usize, reg: Reg) -> u32 {
+    pub fn reg_get(&self, bank: usize, reg: Reg) -> u32 {
         self.reg.get(bank, reg)
     }
-}
 
-// These are functions to set breakpoints on for debugging
-fn at_breakpoint() {}
-fn at_cycle() {}
+    pub fn get_mode(&self) -> mode::Mode {
+        self.reg.mode()
+    }
+}

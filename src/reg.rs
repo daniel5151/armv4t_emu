@@ -23,17 +23,52 @@ pub const SPSR: Reg = 17;
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
 const REG_MAP: [[usize; 18]; 6] = [
-    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 16],
-    [0, 1, 2, 3, 4, 5, 6, 7, 17, 18, 19, 20, 21, 22, 23, 15, 16, 24],
-    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 25, 26, 15, 16, 27],
-    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 28, 29, 15, 16, 30],
-    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 31, 32, 15, 16, 33],
-    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 34, 35, 15, 16, 36],
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 16],   // user
+    [0, 1, 2, 3, 4, 5, 6, 7, 17, 18, 19, 20, 21, 22, 23, 15, 16, 24], // fiq
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 25, 26, 15, 16, 27],   // irq
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 28, 29, 15, 16, 30],   // supervisor
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 31, 32, 15, 16, 33],   // abort
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 34, 35, 15, 16, 36],   // undefined
 ];
 
 pub struct RegFile {
     reg: [u32; NUM_RGSR],
     bank: usize,
+}
+
+// This is pretty jank, due to the way registers are stored
+// It could use some improvement.
+impl std::fmt::Debug for RegFile {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let mut builder = fmt.debug_struct("RegFile");
+        builder.field("cur_bank", &self.bank);
+        for (bank, map) in REG_MAP.iter().enumerate() {
+            let mut regs = Vec::new();
+            for (i, reg) in map.iter().copied().enumerate() {
+                match i as u8 {
+                    SP => regs.push(("SP".to_string(), self.reg[reg])),
+                    LR => regs.push(("LR".to_string(), self.reg[reg])),
+                    PC => regs.push(("PC".to_string(), self.reg[reg])),
+                    CPSR => regs.push(("CPSR".to_string(), self.reg[reg])),
+                    SPSR => regs.push(("SPSR".to_string(), self.reg[reg])),
+                    _ => regs.push((format!("r{}", i), self.reg[reg])),
+                };
+            }
+            builder.field(
+                match bank {
+                    0 => "user       ",
+                    1 => "fiq        ",
+                    2 => "irq        ",
+                    3 => "supervisor ",
+                    4 => "abort      ",
+                    5 => "undefined  ",
+                    _ => unreachable!(),
+                },
+                &format!("{:08x?}", regs).replace("\"", ""),
+            );
+        }
+        builder.finish()
+    }
 }
 
 impl RegFile {
