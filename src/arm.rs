@@ -400,7 +400,8 @@ impl Cpu {
                 };
 
                 // post-indexing implies writeback
-                if p == 0 || w == 1 {
+                // make sure we don't overwrite rd if it was a load
+                if (p == 0 || w == 1) && (rd != rn || l == 0) {
                     self.reg[rn] = post_addr;
                 }
             }
@@ -448,7 +449,8 @@ impl Cpu {
                 };
 
                 // post-indexing implies writeback
-                if p == 0 || w == 1 {
+                // make sure we don't overwrite rd if it was a load
+                if (p == 0 || w == 1) && (rd != rn || l == 0) {
                     self.reg[rn] = post_addr;
                 }
             }
