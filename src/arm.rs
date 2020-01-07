@@ -487,7 +487,7 @@ impl Cpu {
                 let pre_incr = (p == u) as u32;
 
                 let mut rem = reglist;
-                if s == 0 || (rem & (1 << reg::PC)) == 1 {
+                if s == 0 || (rem & (1 << reg::PC)) != 0 {
                     if w == 1 {
                         self.reg[rn] = post_addr;
                     }

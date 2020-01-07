@@ -5,7 +5,6 @@
     clippy::identity_op, // there are times it makes the code line up better
     clippy::deprecated_cfg_attr,
 )]
-#![warn(clippy::bad_bit_mask)] // TODO: remove this once warning is resolved
 
 use std::default::Default;
 use std::iter::IntoIterator;
