@@ -9,8 +9,6 @@
 use std::default::Default;
 use std::iter::IntoIterator;
 
-use log::*;
-
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
