@@ -103,6 +103,8 @@ impl Cpu {
             cpu.reg.set(bank, reg, val);
         }
 
+        cpu.reg.update_bank();
+
         cpu
     }
 

@@ -513,6 +513,7 @@ impl Cpu {
                             self.reg[r] = mmu.r32(idx_addr);
                             if r == reg::PC && s == 1 {
                                 self.reg[reg::CPSR] = self.reg[reg::SPSR];
+                                self.reg.update_bank();
                             }
                         };
                         rem -= 1u32 << r;
