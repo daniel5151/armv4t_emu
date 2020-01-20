@@ -26,10 +26,11 @@ enum Instruction {
     BlockXfer,
     Swap,
     SoftwareInt,
+    CoprocReg,
     Undefined,
 }
 
-const INST_MATCH_ORDER: [Instruction; 17] = [
+const INST_MATCH_ORDER: [Instruction; 18] = [
     Instruction::Branch,
     Instruction::BranchEx,
     Instruction::Swap,
@@ -46,6 +47,7 @@ const INST_MATCH_ORDER: [Instruction; 17] = [
     Instruction::HwSgnXferI,
     Instruction::BlockXfer,
     Instruction::SoftwareInt,
+    Instruction::CoprocReg,
     Instruction::Undefined,
 ];
 
@@ -70,6 +72,7 @@ impl Instruction {
             BlockXfer   => (0x0e00_0000, 0x0800_0000),
             Swap        => (0x0fb0_0ff0, 0x0100_0090),
             SoftwareInt => (0x0f00_0000, 0x0f00_0000),
+            CoprocReg   => (0x0f00_0010, 0x0e00_0010),
             Undefined   => (0x0000_0000, 0x0000_0000),
         }
     }
@@ -564,6 +567,28 @@ impl Cpu {
             }
             SoftwareInt => {
                 self.exception(Exception::Software);
+            }
+            CoprocReg => {
+                let cpopc = inst.extract(21, 3);
+                let d = inst.get_bit(20);
+                let cn = inst.extract(16, 4);
+                let rd = inst.extract(12, 4) as Reg;
+                let pn = inst.extract(8, 4);
+                let cpinf = inst.extract(5, 3);
+                let cm = inst.extract(0, 4);
+
+                if d == 0 {
+                    debug!(
+                        "Writing {:010x?} to P{},C{},C{},{}, cpinfo {}",
+                        self.reg[rd], pn, cn, cm, cpopc, cpinf
+                    );
+                } else {
+                    debug!(
+                        "Reading to R{} from P{},C{},C{},{}, cpinfo {}",
+                        rd, pn, cn, cm, cpopc, cpinf
+                    );
+                    self.reg[rd] = 0;
+                }
             }
             Undefined => return false,
         };
