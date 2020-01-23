@@ -28,7 +28,7 @@ mod util;
 mod tests;
 
 use self::alignment::AlignmentWrapper;
-use self::exception::Exception;
+pub use self::exception::Exception;
 use self::reg::*;
 
 /// Initial registers state according to the ARM documentation.
@@ -119,8 +119,31 @@ impl Cpu {
         }
     }
 
+    /// Check if IRQs are enabled
+    pub fn irq_enable(&self) -> bool {
+        self.reg.get(0, reg::CPSR) & (1 << 7) == 0
+    }
+
+    /// Check if FIQs are enabled
+    pub fn fiq_enable(&self) -> bool {
+        self.reg.get(0, reg::CPSR) & (1 << 6) == 0
+    }
+
     /// Trigger an exception
     pub fn exception(&mut self, exc: Exception) {
+        match exc {
+            Exception::Interrupt => {
+                if !self.irq_enable() {
+                    return;
+                }
+            }
+            Exception::FastInterrupt => {
+                if !self.fiq_enable() {
+                    return;
+                }
+            }
+            _ => (),
+        }
         // this should already be pointing at the next instruction
         let new_mode = exc.mode_on_entry();
         let new_bank = new_mode.reg_bank();
@@ -131,6 +154,7 @@ impl Cpu {
 
         let new_lr = match exc {
             Exception::Interrupt => pc + 4,
+            Exception::FastInterrupt => pc + 4,
             _ => pc,
         };
 
@@ -145,11 +169,6 @@ impl Cpu {
             (1 << 7) /* IRQ disable */ |
             (cpsr & (0xf << 28)) /* condition flags */;
         self.reg.set(0, reg::CPSR, new_cpsr);
-    }
-
-    /// Check if IRQs are enabled
-    pub fn irq_enable(&self) -> bool {
-        self.reg.get(0, reg::CPSR) & (1 << 7) == 0
     }
 
     /// Check if CPU is currently in Thumb mode
