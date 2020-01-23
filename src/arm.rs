@@ -579,13 +579,25 @@ impl Cpu {
 
                 if d == 0 {
                     debug!(
-                        "Writing {:010x?} to P{},C{},C{},{}, cpinfo {}",
-                        self.reg[rd], pn, cn, cm, cpopc, cpinf
+                        "Writing {:010x?} to P{},C{},C{},{}, cpinfo {}, mode: {:?}",
+                        self.reg[rd],
+                        pn,
+                        cn,
+                        cm,
+                        cpopc,
+                        cpinf,
+                        self.get_mode()
                     );
                 } else {
                     debug!(
-                        "Reading to R{} from P{},C{},C{},{}, cpinfo {}",
-                        rd, pn, cn, cm, cpopc, cpinf
+                        "Reading to R{} from P{},C{},C{},{}, cpinfo {}, mode: {:?}",
+                        rd,
+                        pn,
+                        cn,
+                        cm,
+                        cpopc,
+                        cpinf,
+                        self.get_mode()
                     );
                     self.reg[rd] = 0;
                 }
