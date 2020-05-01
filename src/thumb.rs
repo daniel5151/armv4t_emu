@@ -545,10 +545,7 @@ mod test {
         ($name:ident, $mem_checks: expr) => {
             #[test]
             fn $name() {
-                use crate::tests;
                 use crate::tests::ram::Ram;
-
-                tests::setup();
 
                 let prog = include_bytes!(concat!("tests/data/", stringify!($name), ".bin"));
                 let mut mmu = Ram::new_with_data(prog);
