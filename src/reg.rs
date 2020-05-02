@@ -48,7 +48,7 @@ const REG_MAP: [[usize; 18]; 6] = [
 #[cfg(feature = "serde")]
 mod big_array {
     use serde_big_array::big_array;
-    big_array! { BigArray; +super::NUM_RGSR, }
+    big_array! { BigArray; +super::NUM_RGSR }
 }
 
 #[derive(Copy, Clone)]
