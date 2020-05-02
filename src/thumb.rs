@@ -56,9 +56,9 @@ const INST_MATCH_ORDER: [Instruction; 20] = [
 
 impl Instruction {
     #[inline]
+    #[rustfmt::skip]
     fn pattern(self) -> (u16, u16) {
         use self::Instruction::*;
-        #[cfg_attr(rustfmt, rustfmt_skip)]
         match self {
             Shifted     => (0xe000, 0x0000),
             AddSub      => (0xf800, 0x1800),
@@ -97,7 +97,7 @@ impl Instruction {
 impl Cpu {
     /// Executes one instruction and returns whether the CPU should continue
     /// executing.
-    pub fn execute_thumb(&mut self, mmu: &mut impl Memory) -> bool {
+    pub(crate) fn execute_thumb(&mut self, mmu: &mut impl Memory) -> bool {
         let pc = self.reg[reg::PC];
         let inst = mmu.r16(pc) as u32;
         let inst_type = self::Instruction::decode(inst as u16);
@@ -511,7 +511,7 @@ impl Cpu {
 mod test {
     use super::*;
     #[test]
-    #[cfg_attr(rustfmt, rustfmt_skip)]
+    #[rustfmt::skip]
     fn test_decode() {
         use super::Instruction::*;
 
@@ -545,16 +545,16 @@ mod test {
         ($name:ident, $mem_checks: expr) => {
             #[test]
             fn $name() {
-                use crate::tests::ram::Ram;
+                use crate::{ExampleMem, Mode};
 
-                let prog = include_bytes!(concat!("tests/data/", stringify!($name), ".bin"));
-                let mut mmu = Ram::new_with_data(prog);
-                let mut cpu = super::Cpu::new(
+                let prog = include_bytes!(concat!("../tests/data/", stringify!($name), ".bin"));
+                let mut mmu = ExampleMem::new_with_data(prog);
+                let mut cpu = Cpu::new(
                     // Start at 0, with a stack pointer, and in thumb mode
                     &[
-                        (0, reg::PC, 0x0u32),
-                        (0, reg::SP, 0x200),
-                        (0, reg::CPSR, 0x10),
+                        (Mode::User, reg::PC, 0x0u32),
+                        (Mode::User, reg::SP, 0x200),
+                        (Mode::User, reg::CPSR, 0x10),
                     ],
                 );
 
@@ -563,7 +563,7 @@ mod test {
                 let cpsr = cpu.reg[reg::CPSR];
                 cpu.reg[reg::CPSR] = (cpsr & !mask) | mask;
 
-                while cpu.cycle(&mut mmu) {}
+                while cpu.step(&mut mmu) {}
 
                 for &(addr, val) in ($mem_checks).iter() {
                     assert_eq!(val, mmu.r32(addr), "addr: {:#010x}", addr);

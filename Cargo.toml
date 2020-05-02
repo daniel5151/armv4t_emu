@@ -14,9 +14,11 @@ categories = ["emulators"]
 
 [features]
 default = []
+serde-serialize = ["serde", "serde-big-array"]
 advanced_disasm = ["capstone"]
 
 [dependencies]
 log = "0.4"
 serde = { version = "1.0", features = ["derive"], optional = true }
+serde-big-array = { version = "0.2", optional = true }
 capstone = { version = "0.6", optional = true }

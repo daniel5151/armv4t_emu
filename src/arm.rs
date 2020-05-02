@@ -52,9 +52,10 @@ const INST_MATCH_ORDER: [Instruction; 18] = [
 ];
 
 impl Instruction {
+    #[inline]
+    #[rustfmt::skip]
     fn pattern(self) -> (u32, u32) {
         use self::Instruction::*;
-        #[cfg_attr(rustfmt, rustfmt_skip)]
         match self {
             BranchEx    => (0x0fff_fff0, 0x012f_ff10),
             Branch      => (0x0e00_0000, 0x0a00_0000),
@@ -91,7 +92,7 @@ impl Instruction {
 impl Cpu {
     /// Executes one instruction and returns whether the CPU should continue
     /// executing.
-    pub fn execute_arm(&mut self, mmu: &mut impl Memory) -> bool {
+    pub(crate) fn execute_arm(&mut self, mmu: &mut impl Memory) -> bool {
         let pc = self.reg[reg::PC];
         let inst = mmu.r32(pc);
         let inst_type = self::Instruction::decode(inst);
@@ -578,7 +579,7 @@ impl Cpu {
                 let cm = inst.extract(0, 4);
 
                 if d == 0 {
-                    debug!(
+                    info!(
                         "Writing {:010x?} to P{},C{},C{},{}, cpinfo {}, mode: {:?}",
                         self.reg[rd],
                         pn,
@@ -586,10 +587,10 @@ impl Cpu {
                         cm,
                         cpopc,
                         cpinf,
-                        self.get_mode()
+                        self.mode()
                     );
                 } else {
-                    debug!(
+                    info!(
                         "Reading to R{} from P{},C{},C{},{}, cpinfo {}, mode: {:?}",
                         rd,
                         pn,
@@ -597,7 +598,7 @@ impl Cpu {
                         cm,
                         cpopc,
                         cpinf,
-                        self.get_mode()
+                        self.mode()
                     );
                     self.reg[rd] = 0;
                 }
@@ -613,7 +614,7 @@ impl Cpu {
 mod test {
     use super::*;
     #[test]
-    #[cfg_attr(rustfmt, rustfmt_skip)]
+    #[rustfmt::skip]
     fn test_decode() {
         use super::Instruction::*;
 
@@ -646,13 +647,14 @@ mod test {
         ($name:ident, $mem_checks: expr) => {
             #[test]
             fn $name() {
-                use crate::tests::ram::Ram;
+                use crate::ExampleMem;
 
-                let prog = include_bytes!(concat!("tests/data/", stringify!($name), ".bin"));
-                let mut mmu = Ram::new_with_data(prog);
-                let mut cpu = super::Cpu::new(&[(0, reg::PC, 0x0u32), (0, reg::CPSR, 0x10)]);
+                let prog = include_bytes!(concat!("../tests/data/", stringify!($name), ".bin"));
+                let mut mmu = ExampleMem::new_with_data(prog);
+                let mut cpu =
+                    Cpu::new(&[(Mode::User, reg::PC, 0x0u32), (Mode::User, reg::CPSR, 0x10)]);
 
-                while cpu.cycle(&mut mmu) {}
+                while cpu.step(&mut mmu) {}
 
                 for &(addr, val) in ($mem_checks).iter() {
                     assert_eq!(val, mmu.r32(addr), "addr: {:#010x}", addr);

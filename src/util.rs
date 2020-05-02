@@ -121,35 +121,35 @@ pub mod bit {
         }
 
         #[inline]
+        #[rustfmt::skip]
         fn add_flags(self, rhs: u32, carry: u32) -> (u32, u32, u32) {
             let lhs = self;
             // Logic copied from VisualBoyAdvance
             let res = lhs.wrapping_add(rhs).wrapping_add(carry);
 
-            #[cfg_attr(rustfmt, rustfmt_skip)]
-                (res,
-                 ((u32::is_neg(lhs) && u32::is_neg(rhs) && u32::is_pos(res)) ||
-                  (u32::is_pos(lhs) && u32::is_pos(rhs) && u32::is_neg(res))) as u32,
-                 ((u32::is_neg(lhs) && u32::is_neg(rhs)) ||
-                  (u32::is_neg(lhs) && u32::is_pos(res)) ||
-                  (u32::is_neg(rhs) && u32::is_pos(res))) as u32,
-                )
+            (res,
+             ((u32::is_neg(lhs) && u32::is_neg(rhs) && u32::is_pos(res)) ||
+              (u32::is_pos(lhs) && u32::is_pos(rhs) && u32::is_neg(res))) as u32,
+             ((u32::is_neg(lhs) && u32::is_neg(rhs)) ||
+              (u32::is_neg(lhs) && u32::is_pos(res)) ||
+              (u32::is_neg(rhs) && u32::is_pos(res))) as u32,
+            )
         }
 
         #[inline]
+        #[rustfmt::skip]
         fn sub_flags(self, rhs: u32, carry: u32) -> (u32, u32, u32) {
             let lhs = self;
             // Logic copied from VisualBoyAdvance
             let res = lhs.wrapping_sub(rhs).wrapping_sub(carry);
 
-            #[cfg_attr(rustfmt, rustfmt_skip)]
-                (res,
-                 ((u32::is_neg(lhs) && u32::is_pos(rhs) && u32::is_pos(res)) ||
-                  (u32::is_pos(lhs) && u32::is_neg(rhs) && u32::is_neg(res))) as u32,
-                 ((u32::is_neg(lhs) && u32::is_pos(rhs)) ||
-                  (u32::is_neg(lhs) && u32::is_pos(res)) ||
-                  (u32::is_pos(rhs) && u32::is_pos(res))) as u32,
-                )
+            (res,
+             ((u32::is_neg(lhs) && u32::is_pos(rhs) && u32::is_pos(res)) ||
+              (u32::is_pos(lhs) && u32::is_neg(rhs) && u32::is_neg(res))) as u32,
+             ((u32::is_neg(lhs) && u32::is_pos(rhs)) ||
+              (u32::is_neg(lhs) && u32::is_pos(res)) ||
+              (u32::is_pos(rhs) && u32::is_pos(res))) as u32,
+            )
         }
     }
 
@@ -227,7 +227,7 @@ pub mod arm {
 
     #[inline]
     pub fn build_flags(v: u32, c: u32, z: u32, n: u32) -> u32 {
-        (v & 1) << 0 | (c & 1) << 1 | (z & 1) << 2 | (n & 1) << 3
+        (v & 1) | (c & 1) << 1 | (z & 1) << 2 | (n & 1) << 3
     }
 
     #[inline]

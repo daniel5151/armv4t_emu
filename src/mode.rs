@@ -1,5 +1,4 @@
-use log::*;
-
+/// An ARMv4T processor mode.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Mode {
     User,
@@ -13,9 +12,9 @@ pub enum Mode {
 
 impl Mode {
     #[inline]
-    pub fn from_bits(mode: u8) -> Self {
+    pub(crate) fn from_bits(mode: u8) -> Option<Self> {
         use self::Mode::*;
-        match mode & 0x1f {
+        Some(match mode & 0x1f {
             0x10 => User,
             0x11 => Fiq,
             0x12 => Irq,
@@ -23,15 +22,12 @@ impl Mode {
             0x17 => Abort,
             0x1b => Undefined,
             0x1f => System,
-            _ => {
-                warn!("Invalid mode bits: {:#x}", mode);
-                User
-            }
-        }
+            _ => return None,
+        })
     }
 
     #[inline]
-    pub fn bits(self) -> u8 {
+    pub(crate) fn bits(self) -> u8 {
         use self::Mode::*;
         match self {
             User => 0x10,
@@ -45,7 +41,7 @@ impl Mode {
     }
 
     #[inline]
-    pub fn reg_bank(self) -> usize {
+    pub(crate) fn reg_bank(self) -> usize {
         use self::Mode::*;
         match self {
             User => 0,

@@ -1,6 +1,6 @@
 use crate::mode::Mode;
 
-#[allow(dead_code)]
+/// An ARMv4T processor exception.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Exception {
     Reset,
@@ -8,12 +8,13 @@ pub enum Exception {
     Software,
     PreAbort,
     DataAbort,
-    Addr26Bit,
     Interrupt,
     FastInterrupt,
 }
 
 impl Exception {
+    /// Returns the ARM processor mode that's switched to upon handling the
+    /// exception.
     #[inline]
     pub fn mode_on_entry(self) -> Mode {
         use self::Exception::*;
@@ -23,12 +24,12 @@ impl Exception {
             Software => Mode::Supervisor,
             PreAbort => Mode::Abort,
             DataAbort => Mode::Abort,
-            Addr26Bit => Mode::Supervisor,
             Interrupt => Mode::Irq,
             FastInterrupt => Mode::Fiq,
         }
     }
 
+    /// Returns the address of the exception's Vector Table entry.
     #[inline]
     pub fn address(self) -> u32 {
         use self::Exception::*;
@@ -38,14 +39,13 @@ impl Exception {
             Software => 0x08,
             PreAbort => 0x0c,
             DataAbort => 0x10,
-            Addr26Bit => 0x14,
             Interrupt => 0x18,
             FastInterrupt => 0x1c,
         }
     }
 
     #[inline]
-    pub fn fiq_disable(self) -> bool {
+    pub(crate) fn fiq_disable(self) -> bool {
         use self::Exception::*;
         match self {
             FastInterrupt | Reset => true,

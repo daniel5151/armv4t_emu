@@ -1,12 +1,10 @@
-use std::default::Default;
+//! Register identifiers.
+
 use std::ops::{Index, IndexMut};
 
+use log::*;
 #[cfg(feature = "serde")]
-use serde::{
-    de::{self, SeqAccess, Visitor},
-    ser::SerializeTuple,
-    Deserialize, Deserializer, Serialize, Serializer,
-};
+use serde::{Deserialize, Serialize};
 
 use crate::mode::Mode;
 use crate::util::bit::BitUtilExt;
@@ -15,13 +13,29 @@ pub type Reg = u8;
 
 const NUM_RGSR: usize = 37;
 
+/// Stack Pointer (R13)
 pub const SP: Reg = 13;
+/// Link Register (R14)
 pub const LR: Reg = 14;
+/// Program Counter (R15)
 pub const PC: Reg = 15;
+/// Current Program Status Register
 pub const CPSR: Reg = 16;
+/// Saved Program Status Register
 pub const SPSR: Reg = 17;
 
-#[cfg_attr(rustfmt, rustfmt_skip)]
+pub(crate) mod cpsr {
+    use super::Reg;
+
+    pub const N: Reg = 31;
+    pub const Z: Reg = 30;
+    pub const C: Reg = 29;
+    pub const V: Reg = 28;
+
+    pub const T: Reg = 5;
+}
+
+#[rustfmt::skip]
 const REG_MAP: [[usize; 18]; 6] = [
     [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 16],   // user
     [0, 1, 2, 3, 4, 5, 6, 7, 17, 18, 19, 20, 21, 22, 23, 15, 16, 24], // fiq
@@ -31,10 +45,27 @@ const REG_MAP: [[usize; 18]; 6] = [
     [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 34, 35, 15, 16, 36],   // undefined
 ];
 
-pub struct RegFile {
+#[cfg(feature = "serde")]
+mod big_array {
+    use serde_big_array::big_array;
+    big_array! { BigArray; +super::NUM_RGSR, }
+}
+
+#[derive(Copy, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub(crate) struct RegFile {
+    #[cfg_attr(feature = "serde", serde(with = "big_array::BigArray"))]
     reg: [u32; NUM_RGSR],
     bank: usize,
 }
+
+impl PartialEq for RegFile {
+    fn eq(&self, other: &Self) -> bool {
+        self.reg[..] == other.reg[..] && self.bank == other.bank
+    }
+}
+
+impl Eq for RegFile {}
 
 // This is pretty jank, due to the way registers are stored
 // It could use some improvement.
@@ -72,9 +103,19 @@ impl std::fmt::Debug for RegFile {
 }
 
 impl RegFile {
+    pub fn new_empty() -> RegFile {
+        RegFile {
+            reg: [0; NUM_RGSR],
+            bank: 0,
+        }
+    }
+
     #[inline]
     pub fn mode(&self) -> Mode {
+        // `expect` should never be fired, as mode bits are checked to be valid when
+        // setting the CPSR value.
         Mode::from_bits(self.reg[CPSR as usize].extract(0, 5) as u8)
+            .expect("CPSR contained invalid mode bits")
     }
 
     #[inline]
@@ -83,7 +124,29 @@ impl RegFile {
     }
 
     #[inline]
-    pub fn set(&mut self, bank: usize, reg: Reg, val: u32) {
+    pub fn set(&mut self, bank: usize, reg: Reg, mut val: u32) {
+        if reg == CPSR {
+            let bits = val.extract(0, 5) as u8;
+            let mode = Mode::from_bits(bits);
+            if mode.is_none() {
+                // Switching to an invalid mode leads to unpredictable behavior.
+                //
+                // Panicking here would be unnecessarily harsh, as the error is
+                // originating from emulated code, which the end-user might not
+                // have written themselves.
+                //
+                // Instead, we take a page out of QEMU's book and simply leave
+                // the mode bits unchanged, while logging an error.
+                error!(
+                    "Attempted to write to CPSR with invalid mode bits: {:#x}",
+                    bits
+                );
+
+                let oldval = self.reg[CPSR as usize];
+                val = (val & !0x1f) | (oldval & 0x1f);
+            }
+        }
+
         self.reg[REG_MAP[bank][reg as usize]] = val;
         if reg == CPSR {
             self.update_bank()
@@ -93,15 +156,6 @@ impl RegFile {
     #[inline]
     pub fn get(&self, bank: usize, reg: Reg) -> u32 {
         self.reg[REG_MAP[bank][reg as usize]]
-    }
-}
-
-impl Default for RegFile {
-    fn default() -> RegFile {
-        RegFile {
-            reg: [0; NUM_RGSR],
-            bank: 0,
-        }
     }
 }
 
@@ -118,57 +172,4 @@ impl IndexMut<Reg> for RegFile {
     fn index_mut(&mut self, idx: Reg) -> &mut u32 {
         &mut self.reg[REG_MAP[self.bank][idx as usize]]
     }
-}
-
-#[cfg(feature = "serde")]
-impl Serialize for RegFile {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut seq = serializer.serialize_tuple(NUM_RGSR)?;
-        for r in self.reg.iter() {
-            seq.serialize_element(r)?;
-        }
-        seq.end()
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for RegFile {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        struct RegVisitor;
-        impl<'de> Visitor<'de> for RegVisitor {
-            type Value = RegFile;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("tuple RegFile")
-            }
-
-            fn visit_seq<V: SeqAccess<'de>>(self, mut seq: V) -> Result<RegFile, V::Error> {
-                let mut reg = RegFile {
-                    reg: [0; NUM_RGSR],
-                    bank: 0,
-                };
-                for i in 0..NUM_RGSR {
-                    reg.reg[i] = seq
-                        .next_element()?
-                        .ok_or_else(|| de::Error::invalid_length(i, &self))?;
-                }
-                reg.update_bank();
-
-                Ok(reg)
-            }
-        }
-
-        deserializer.deserialize_tuple(NUM_RGSR, RegVisitor)
-    }
-}
-
-pub mod cpsr {
-    use super::Reg;
-
-    pub const N: Reg = 31;
-    pub const Z: Reg = 30;
-    pub const C: Reg = 29;
-    pub const V: Reg = 28;
-
-    pub const T: Reg = 5;
 }
