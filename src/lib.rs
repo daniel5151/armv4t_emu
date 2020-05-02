@@ -1,3 +1,31 @@
+//! An emulator for the ARMv4T instruction set.
+//!
+//! ## Example
+//!
+//! ```
+//! use armv4t_emu::{reg, Cpu, ExampleMem, Mode, Memory};
+//!
+//! let prog = &[
+//!     0x06, 0x00, 0xa0, 0xe3, //    mov r0, #6
+//!     0x01, 0x10, 0xa0, 0xe3, //    mov r1, #1
+//!     0x01, 0x10, 0x81, 0xe0, // l: add r1, r1, r1
+//!     0x01, 0x00, 0x50, 0xe2, //    subs r0, #1
+//!     0xfc, 0xff, 0xff, 0x1a, //    bne l
+//!     0x01, 0x6c, 0xa0, 0xe3, //    mov r6, #0x100
+//!     0x00, 0x10, 0x86, 0xe5, //    str r1, [r6]
+//!     0xf7, 0xf0, 0xde, 0xad  // ; trigger undefined instr exception
+//! ];
+//!
+//! let mut mem = ExampleMem::new_with_data(prog);
+//! let mut cpu = Cpu::new();
+//! cpu.reg_set(Mode::User, reg::PC, 0x00);
+//! cpu.reg_set(Mode::User, reg::CPSR, 0x10);
+//!
+//! while cpu.step(&mut mem) {}
+//!
+//! assert_eq!(64, mem.r32(0x100));
+//! ```
+
 #![allow(
     clippy::cognitive_complexity, // instruction decode methods are large
     clippy::many_single_char_names, // ...it's a CPU, what do you expect?
@@ -122,14 +150,23 @@ impl Cpu {
     }
 
     /// Step the CPU a single instruction with the given memory object.
+    ///
+    /// As a testing convenience, this method returns false if a undefined
+    /// instruction exception is triggered.
     pub fn step(&mut self, mem: &mut impl Memory) -> bool {
         let mut mem = AlignmentWrapper::new(mem);
 
-        if !self.thumb_mode() {
+        let decode_ok = if !self.thumb_mode() {
             self.execute_arm(&mut mem)
         } else {
             self.execute_thumb(&mut mem)
+        };
+
+        if !decode_ok {
+            self.exception(Exception::Undefined)
         }
+
+        decode_ok
     }
 
     /// Trigger a CPU exception.
