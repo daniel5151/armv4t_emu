@@ -549,14 +549,12 @@ mod test {
 
                 let prog = include_bytes!(concat!("../tests/data/", stringify!($name), ".bin"));
                 let mut mmu = ExampleMem::new_with_data(prog);
-                let mut cpu = Cpu::new(
-                    // Start at 0, with a stack pointer, and in thumb mode
-                    &[
-                        (Mode::User, reg::PC, 0x0u32),
-                        (Mode::User, reg::SP, 0x200),
-                        (Mode::User, reg::CPSR, 0x10),
-                    ],
-                );
+                let mut cpu = Cpu::new();
+
+                // Start at 0, with a stack pointer, and in thumb mode
+                cpu.reg_set(Mode::User, reg::PC, 0x00);
+                cpu.reg_set(Mode::User, reg::SP, 0x200);
+                cpu.reg_set(Mode::User, reg::CPSR, 0x10);
 
                 // set thumb mode
                 let mask = 1u32 << cpsr::T;

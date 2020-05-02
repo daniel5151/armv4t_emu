@@ -1,21 +1,21 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 use crate::Memory;
 
-/// An example memory device backed by a HashMap<u32, u8>.
+/// Example memory device backed by a BTreeMap<u32, u8>.
 ///
 /// Uninitialized memory returns 0x00.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Default)]
-pub struct ExampleMem(HashMap<u32, u8>);
+pub struct ExampleMem(BTreeMap<u32, u8>);
 
 impl ExampleMem {
     /// Constructs a new, empty ExampleMem.
     pub fn new() -> ExampleMem {
-        ExampleMem(HashMap::new())
+        ExampleMem(BTreeMap::new())
     }
 
     /// Constructs a new ExampleMem from the provided slice. Data is copied

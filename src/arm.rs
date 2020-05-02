@@ -651,8 +651,9 @@ mod test {
 
                 let prog = include_bytes!(concat!("../tests/data/", stringify!($name), ".bin"));
                 let mut mmu = ExampleMem::new_with_data(prog);
-                let mut cpu =
-                    Cpu::new(&[(Mode::User, reg::PC, 0x0u32), (Mode::User, reg::CPSR, 0x10)]);
+                let mut cpu = Cpu::new();
+                cpu.reg_set(Mode::User, reg::PC, 0x00);
+                cpu.reg_set(Mode::User, reg::CPSR, 0x10);
 
                 while cpu.step(&mut mmu) {}
 

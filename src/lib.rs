@@ -27,12 +27,6 @@ pub use mode::Mode;
 use crate::alignment::AlignmentWrapper;
 use crate::reg::*;
 
-/// Initial Cpu state according to the ARM documentation.
-///
-/// http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.faqs/ka3761.html
-pub const ARM_INIT: &[(Mode, Reg, u32)] =
-    &[(Mode::User, reg::PC, 0), (Mode::User, reg::CPSR, 0xd3)];
-
 /// Encodes how the `Cpu` accesses external memory / memory-mapped devices.
 ///
 /// ### Handling Memory Access Errors
@@ -93,9 +87,21 @@ impl std::fmt::Debug for Cpu {
     }
 }
 
+impl Default for Cpu {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Cpu {
-    /// Construct a new `Cpu`.
-    pub fn new<'a>(regs: impl IntoIterator<Item = &'a (Mode, Reg, u32)>) -> Self {
+    /// Construct a new ARMv4T `Cpu`, with registers set to default "cold-boot"
+    /// values.
+    ///
+    /// Specifically, `PC` is set to `0x00000000`, and `CPSR` is set to `0xd3`
+    /// (ARM state, Supervisor mode, FIQ and IRQ mask bits set). Technically,
+    /// the ARM spec states that all other registers can have undefined values
+    /// on-boot, but in this emulator, all registers are set to 0 on-boot.
+    pub fn new() -> Cpu {
         let mut cpu = Cpu {
             reg: RegFile::new_empty(),
             #[cfg(feature = "advanced_disasm")]
@@ -109,12 +115,8 @@ impl Cpu {
             ),
         };
 
-        // load any custom register values
-        for &(mode, reg, val) in regs.into_iter() {
-            cpu.reg.set(mode.reg_bank(), reg, val);
-        }
-
-        cpu.reg.update_bank();
+        cpu.reg_set(Mode::User, reg::PC, 0x00);
+        cpu.reg_set(Mode::User, reg::CPSR, 0xd3);
 
         cpu
     }
