@@ -99,7 +99,7 @@ impl Cpu {
     /// executing.
     pub(crate) fn execute_thumb(&mut self, mmu: &mut impl Memory) -> bool {
         let pc = self.reg[reg::PC];
-        let inst = mmu.r16(pc) as u32;
+        let inst = mmu.x16(pc) as u32;
         let inst_type = self::Instruction::decode(inst as u16);
         let cpsr = self.reg[reg::CPSR];
         let c = cpsr.get_bit(cpsr::C);
