@@ -95,6 +95,15 @@ pub trait Memory {
     fn w16(&mut self, addr: u32, val: u16);
     /// Write a 32-bit `val` to `addr`
     fn w32(&mut self, addr: u32, val: u32);
+
+    /// Read a 16-bit value from `addr`, instruction interface (defaults to data interface)
+    fn x16(&mut self, addr: u32) -> u16 {
+        self.r16(addr)
+    }
+    /// Read a 32-bit value from `addr`, instruction interface (defaults to data interface)
+    fn x32(&mut self, addr: u32) -> u32 {
+        self.r32(addr)
+    }
 }
 
 /// An emulated CPU which implements the ARMv4T instruction set.

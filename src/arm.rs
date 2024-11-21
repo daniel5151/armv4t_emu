@@ -94,7 +94,7 @@ impl Cpu {
     /// executing.
     pub(crate) fn execute_arm(&mut self, mmu: &mut impl Memory) -> bool {
         let pc = self.reg[reg::PC];
-        let inst = mmu.r32(pc);
+        let inst = mmu.x32(pc);
         let inst_type = self::Instruction::decode(inst);
 
         let cond = inst.extract(28, 4);
