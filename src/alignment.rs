@@ -46,4 +46,20 @@ impl<T: Memory> Memory for AlignmentWrapper<'_, T> {
     fn w32(&mut self, addr: u32, val: u32) {
         self.0.w32(addr & !3, val);
     }
+
+    fn x16(&mut self, addr: u32) -> u16 {
+        self.0.x16(addr)
+    }
+
+    fn x32(&mut self, addr: u32) -> u32 {
+        let a = addr & !3;
+
+        let val = self.0.x32(a);
+        if a == addr {
+            val
+        } else {
+            let shift = (addr & 3) * 8;
+            val.rotate_right(shift)
+        }
+    }
 }
