@@ -107,7 +107,10 @@ pub trait Memory {
 }
 
 /// An emulated CPU which implements the ARMv4T instruction set.
-#[derive(Copy, Clone, PartialEq, Eq)]
+
+// CPU cannot derive `Copy` or `Clone` if the `advanced_disasm` feature is enabled because
+// `Capstone` does not implement those traits.
+#[cfg_attr(not(feature = "advanced_disasm"), derive(Copy, Clone, PartialEq, Eq))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Cpu {
     /// Registers
